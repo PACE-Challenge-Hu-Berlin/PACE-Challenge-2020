@@ -183,8 +183,8 @@ struct graph {
 
 	// Compute the degree of a vertex.
 	// Note that this is not O(1) because we need to check for eliminated vertices.
-	unsigned int degree(vertex v) const {
-		unsigned int d = 0;
+	int degree(vertex v) const {
+		int d = 0;
 		for(vertex w : neighbors(v)) {
 			(void)w;
 			++d;
