@@ -27,7 +27,7 @@ int naive_branching_solver::compute_treedepth() {
 }
 
 // Return true and compute the treedepth of the graph if it is <= k.
-// Otherwise, return false.
+// Otherwise, return false and (k + 1) as treedepth.
 std::pair<bool, int> naive_branching_solver::recurse_(int k) {
 
 	// We should should never recursively call this with k < 0.
@@ -55,17 +55,41 @@ std::pair<bool, int> naive_branching_solver::recurse_(int k) {
 
 	if(cc.num_components() > 1) {
 		int worst = 0;
-		for(size_t i = 0; i < cc.num_components(); i++) {
-			for(vertex v : cc.component(i))
+
+		// Eliminate all but the first component.
+		for(size_t j = 1; j < cc.num_components(); j++)
+			for(vertex v : cc.component(j))
 				g_->eliminate(v);
+
+		// Invariant: Only the i-th component is uneliminated.
+		size_t i;
+		for(i = 0; /* exit through break below */ ; i++) {
 			stats_.num_branches++;
 			std::tie(feasible, s) = recurse_(k);
-			for(vertex v : cc.component(i))
-				g_->uneliminate(v);
-			if(!feasible)
-				return {false, k + 1};
 			worst = std::max(worst, s);
+
+			if(!feasible)
+				break;
+
+			// Eliminate the i-th component, uneliminate the (i+1)-th.
+			if(i + 1 >= cc.num_components())
+				break;
+			for(vertex v : cc.component(i))
+				g_->eliminate(v);
+			for(vertex v : cc.component(i + 1))
+				g_->uneliminate(v);
 		}
+
+		// Uneliminate all but the i-th component.
+		for(size_t j = 0; j < cc.num_components(); j++) {
+			if(j == i)
+				continue;
+			for(vertex v : cc.component(j))
+				g_->uneliminate(v);
+		}
+
+		if(worst == k + 1)
+			return {false, k + 1};
 		return {true, worst};
 	}else{
 		int best = k;
