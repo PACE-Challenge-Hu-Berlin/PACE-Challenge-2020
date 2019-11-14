@@ -28,6 +28,44 @@ namespace {
 	private:
 		const simple_pid_solver::feasible_composition *p_;
 	};
+
+	struct print_memory {
+		friend std::ostream &operator<< (std::ostream &os, const print_memory &self) {
+			if(self.n_ > 10 * (size_t(1) << 30)) {
+				os << self.n_ << " GiB";
+			}else if(self.n_ >= 10 * (size_t(1) << 20)) {
+				os << (self.n_ >> 20) << " MiB";
+			}else if(self.n_ > 10 * (size_t(1) << 10)) {
+				os << (self.n_ >> 10) << " KiB";
+			}else{
+				os << self.n_ << " B";
+			}
+			return os;
+		}
+
+		print_memory(size_t n)
+		: n_{n} { }
+
+	private:
+		size_t n_;
+	};
+
+	template<typename T, typename A>
+	std::vector<T> copy_from(const std::vector<T, A> &vec) {
+		std::vector<T> res;
+		res.reserve(vec.size());
+		res.insert(res.end(), vec.begin(), vec.end());
+		return res;
+	}
+
+	template<typename T>
+	std::vector<T, arena_allocator<T>> copy_to_arena(const std::vector<T> &vec,
+			memory_arena &arena) {
+		std::vector<T, arena_allocator<T>> res{arena_allocator<T>{arena}};
+		res.reserve(vec.size());
+		res.insert(res.end(), vec.begin(), vec.end());
+		return res;
+	}
 }
 
 simple_pid_solver::simple_pid_solver(graph &g)
@@ -79,11 +117,16 @@ int simple_pid_solver::compute_treedepth() {
 bool simple_pid_solver::decide_treedepth_(int k) {
 	feasible_trees.clear();
 	staged_trees.clear();
+	eternal_arena_.reset();
 
 	for(vertex v : g_->vertices()) {
 		if(g_->degree(v) + 1 > k)
 			continue;
-		staged_trees.insert({{v}, {1, true}});
+		workset_.clear();
+		workset_.push_back(v);
+		staged_tree staged{copy_to_arena(workset_, eternal_arena_), 1, true};
+		vertex_span vs{staged.vertices}; // Careful with the move below.
+		staged_trees.emplace(vs, std::move(staged));
 	}
 
 	for(int h = 1; h < k; h++) {
@@ -95,7 +138,6 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		// Move trees for the current h from the staging buffer to the set of feasible trees.
 		auto sit = staged_trees.begin();
 		while(sit != staged_trees.end()) {
-			const auto &vertices = sit->first;
 			const auto &staged = sit->second;
 			if(staged.h != h) {
 				++sit;
@@ -106,9 +148,9 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			pivot_marker_.reset(g_->id_limit());
 			pivot_neighbor_marker_.reset(g_->id_limit());
 			separator_.clear();
-			for(vertex v : vertices)
+			for(vertex v : staged.vertices)
 				pivot_marker_.mark(v);
-			for(vertex v : vertices)
+			for(vertex v : staged.vertices)
 				for(vertex w : g_->neighbors(v)) {
 					if(pivot_marker_.is_marked(w))
 						continue;
@@ -119,9 +161,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				}
 
 			size_t idx = feasible_trees.size();
-			feasible_trees.push_back(feasible_tree{vertices, staged.h});
-			join_q_.push(feasible_forest{idx, vertices, std::move(separator_),
-					true, staged.trivial});
+			join_q_.push(feasible_forest{idx,
+					copy_from(staged.vertices), // Careful with the move below.
+					std::move(separator_), true, staged.trivial});
+			feasible_trees.push_back(feasible_tree{std::move(staged.vertices), staged.h});
 			sit = staged_trees.erase(sit);
 		}
 
@@ -151,7 +194,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			num_compose_++;
 
 			if(comp.h > h) {
-				auto improves_staged = [&] (const staged_data &staged) {
+				auto improves_staged = [&] (const staged_tree &staged) {
 					if(comp.h < staged.h)
 						return true;
 					if(comp.h > staged.h)
@@ -160,14 +203,16 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				};
 
 				std::sort(comp.vertices.begin(), comp.vertices.end());
-				auto ins = staged_trees.insert({std::move(comp.vertices), staged_data{}});
-				auto &staged = ins.first->second;
-				if(ins.second || improves_staged(staged)) {
-					if(debug_trees)
-						std::cerr << "    k = " << k << ", h = " << h
-								<< ": staging " << print_composition{comp} << std::endl;
-					staged.h = comp.h;
-					staged.trivial = comp.trivial;
+
+				auto it = staged_trees.find(vertex_span{comp.vertices});
+				if(it == staged_trees.end()) {
+					staged_tree staged{copy_to_arena(comp.vertices, eternal_arena_),
+							comp.h, comp.trivial};
+					vertex_span vs{staged.vertices}; // Careful with the move below.
+					staged_trees.emplace(vs, std::move(staged));
+				}else if(improves_staged(it->second)) {
+					it->second.h = comp.h;
+					it->second.trivial = comp.trivial;
 				}
 			}
 		}
@@ -179,18 +224,20 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "    non-disjoint objects: " << stats_.num_non_disjoint
 				<< ", non-separated: " << stats_.num_non_separated
 				<< ", empty separator: " << stats_.num_empty_separator << std::endl;
+		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
+				<< ", allocations: " << eternal_arena_.num_allocations()
+				<< std::endl;
 	}
 
 	// Move trees for the final h from the staging buffer to the set of feasible trees.
 	auto sit = staged_trees.begin();
 	while(sit != staged_trees.end()) {
-		const auto &vertices = sit->first;
 		const auto &staged = sit->second;
 		if(staged.h != k) {
 			++sit;
 			continue;
 		}
-		feasible_trees.push_back({vertices, staged.h});
+		feasible_trees.push_back(feasible_tree{std::move(staged.vertices), staged.h});
 		sit = staged_trees.erase(sit);
 	}
 

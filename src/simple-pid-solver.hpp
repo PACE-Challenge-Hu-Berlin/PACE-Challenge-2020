@@ -5,6 +5,7 @@
 
 #include "data-structures.hpp"
 #include "graph.hpp"
+#include "mm.hpp"
 
 struct simple_pid_solver {
 	struct statistics {
@@ -13,8 +14,18 @@ struct simple_pid_solver {
 		int64_t num_empty_separator = 0;
 	};
 
+	// Lightweight reference to a set of vertices.
+	struct vertex_span {
+		template<typename A>
+		vertex_span(const std::vector<vertex, A> &vec)
+		: begin{vec.data()}, end{vec.data() + vec.size()} { }
+
+		const vertex *begin;
+		const vertex *end;
+	};
+
 	struct feasible_tree {
-		std::vector<vertex> vertices;
+		std::vector<vertex, arena_allocator<vertex>> vertices;
 		int h;
 	};
 
@@ -35,7 +46,8 @@ struct simple_pid_solver {
 		bool trivial;
 	};
 
-	struct staged_data {
+	struct staged_tree {
+		std::vector<vertex, arena_allocator<vertex>> vertices;
 		int h;
 		// Vertices can only be arranged in a path.
 		bool trivial;
@@ -44,20 +56,22 @@ struct simple_pid_solver {
 	struct staging_hash {
 		// Possibly the worst hash function ever imagined.
 		// TODO: Pick a reasonable hash function.
-		size_t operator() (const std::vector<vertex> &vs) const {
+		size_t operator() (const vertex_span &vs) const {
 			size_t hash = 0x12345678;
-			for(vertex v : vs)
-				hash = 13 * hash + v;
+			for(auto p = vs.begin; p != vs.end; ++p)
+				hash = 13 * hash + *p;
 			return hash;
 		}
 	};
 
 	struct staging_equals {
-		bool operator() (const std::vector<vertex> &vs1, const std::vector<vertex> &vs2) const {
-			if(vs1.size() != vs2.size())
+		bool operator() (const vertex_span &vs1, const vertex_span &vs2) const {
+			size_t sz1 = vs1.end - vs1.begin;
+			size_t sz2 = vs1.end - vs1.begin;
+			if(sz1 != sz2)
 				return false;
-			for(size_t i = 0; i < vs1.size(); i++)
-				if(vs1[i] != vs2[i])
+			for(size_t i = 0; i < sz1; i++)
+				if(vs1.begin[i] != vs2.begin[i])
 					return false;
 			return true;
 		}
@@ -77,6 +91,7 @@ private:
 	void compose_(int k, int h, feasible_composition &comp);
 
 	graph *g_;
+	memory_arena eternal_arena_;
 	statistics stats_;
 
 	// Set of all feasible trees of height <= current h.
@@ -84,8 +99,8 @@ private:
 
 	// (Incomplete) set of feasible trees of height > current h.
 	std::unordered_map<
-		std::vector<vertex>,
-		staged_data,
+		vertex_span,
+		staged_tree,
 		staging_hash,
 		staging_equals
 	> staged_trees;
