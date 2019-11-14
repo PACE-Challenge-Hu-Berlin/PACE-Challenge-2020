@@ -5,10 +5,6 @@
 
 // Memory area that is always freed entirely at once.
 struct memory_arena {
-	using propagate_on_container_copy_assignment = std::true_type;
-	using propagate_on_container_move_assignment = std::true_type;
-	using propagate_on_container_swap = std::true_type;
-
 	memory_arena();
 
 	memory_arena(const memory_arena &) = delete;
@@ -57,6 +53,10 @@ private:
 template <class T>
 struct arena_allocator {
 	using value_type = T;
+
+	using propagate_on_container_copy_assignment = std::true_type;
+	using propagate_on_container_move_assignment = std::true_type;
+	using propagate_on_container_swap = std::true_type;
 
 	arena_allocator(memory_arena &arena) noexcept
 	: arena_{&arena} { }
