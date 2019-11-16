@@ -24,7 +24,10 @@ namespace {
 	}
 
 	// Ridiculously large virtual memory area.
-	static size_t vspace = 1024 * size_t(1024 * 1024 * 1024);
+	static constexpr size_t vspace = 1024 * size_t(1024 * 1024 * 1024);
+
+	// Prefer 2 MiB pages.
+	static constexpr size_t page_size = 0x200000;
 
 	void *reserve_vm(size_t size) {
 		// PROT_NONE areas do not count towards overcommitting.
@@ -56,6 +59,8 @@ namespace {
 	}
 };
 
+// --------------------------------------------------------------------------------------
+
 memory_arena::memory_arena() {
 	base_ = reinterpret_cast<char *>(reserve_vm(vspace));
 }
@@ -77,4 +82,53 @@ void memory_arena::reset() {
 	uncommit_vm(base_, limit_);
 	limit_ = 0;
 	num_allocations_ = 0;
+}
+
+// --------------------------------------------------------------------------------------
+
+queue_memory::queue_memory()
+: slice_space_{vspace} { }
+
+queue_memory::~queue_memory() {
+	while(!slices_.empty()) {
+		unreserve_vm(slices_.front().base, vspace);
+		slices_.pop_front();
+	}
+}
+
+void queue_memory::open_chunk_() {
+	assert(!seal_ptr_);
+
+	auto base = reinterpret_cast<char *>(reserve_vm(vspace));
+	slices_.push_back(slice{base});
+	frontier_ = 0;
+	commit_limit_ = 0;
+}
+
+void queue_memory::close_chunk_() {
+	assert(!slices_.empty());
+
+	unreserve_vm(slices_.front().base, vspace);
+	slices_.pop_front();
+	uncommit_limit_ = 0;
+}
+
+void queue_memory::commit_(size_t threshold) {
+	assert(!slices_.empty());
+	assert(threshold > commit_limit_);
+
+	size_t lim = (threshold + commit_threshold + page_size - 1) & ~(page_size - 1);
+	assert(lim > commit_limit_);
+	commit_vm(slices_.back().base + commit_limit_, lim - commit_limit_);
+	commit_limit_ = lim;
+}
+
+void queue_memory::uncommit_(size_t threshold) {
+	assert(!slices_.empty());
+	assert(threshold > uncommit_limit_);
+
+	size_t lim = threshold & ~(page_size - 1);
+	assert(lim > uncommit_limit_);
+	uncommit_vm(slices_.front().base + uncommit_limit_, lim - uncommit_limit_);
+	uncommit_limit_ = lim;
 }

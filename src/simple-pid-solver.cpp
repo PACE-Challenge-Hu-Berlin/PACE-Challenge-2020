@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 
 #include "connected-components.hpp"
@@ -50,21 +51,30 @@ namespace {
 		size_t n_;
 	};
 
-	template<typename T, typename A>
-	std::vector<T> copy_from(const std::vector<T, A> &vec) {
-		std::vector<T> res;
-		res.reserve(vec.size());
-		res.insert(res.end(), vec.begin(), vec.end());
-		return res;
+	template<typename C>
+	vertex_span copy_to_arena(const C &vec, memory_arena &memory) {
+		arena_allocator<vertex> alloc{memory};
+		auto p = alloc.allocate(vec.size());
+		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
+		return vertex_span{p, p + vec.size()};
 	}
 
-	template<typename T>
-	std::vector<T, arena_allocator<T>> copy_to_arena(const std::vector<T> &vec,
-			memory_arena &arena) {
-		std::vector<T, arena_allocator<T>> res{arena_allocator<T>{arena}};
-		res.reserve(vec.size());
-		res.insert(res.end(), vec.begin(), vec.end());
-		return res;
+	template<typename C>
+	vertex_span copy_to_queue(const C &vec, queue_memory &memory) {
+		queue_allocator<vertex> alloc{memory};
+		auto p = alloc.allocate(vec.size());
+		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
+		return vertex_span{p, p + vec.size()};
+	}
+
+	void free_in_arena(vertex_span vs, memory_arena &memory) {
+		arena_allocator<vertex> alloc{memory};
+		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
+	}
+
+	void free_in_queue(vertex_span vs, queue_memory &memory) {
+		queue_allocator<vertex> alloc{memory};
+		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
 	}
 }
 
@@ -115,6 +125,8 @@ int simple_pid_solver::compute_treedepth() {
 }
 
 bool simple_pid_solver::decide_treedepth_(int k) {
+	for(const feasible_tree &tree : feasible_trees)
+		free_in_arena(tree.vertices, eternal_arena_);
 	feasible_trees.clear();
 	staged_trees.clear();
 	eternal_arena_.reset();
@@ -162,8 +174,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 
 			auto idx = feasible_trees.size();
 			join_q_.push(feasible_forest{g_->id_limit(), idx,
-					copy_from(staged.vertices), // Careful with the move below.
-					std::move(separator_), true, staged.trivial});
+					copy_to_queue(staged.vertices, join_memory_),
+					copy_to_queue(separator_, join_memory_),
+					true, staged.trivial});
+			join_memory_.seal();
 			vertex_span vs{staged.vertices}; // Careful with the move below.
 			feasible_trees.insert(vs, feasible_tree{idx, std::move(staged.vertices), staged.h});
 			sit = staged_trees.erase(sit);
@@ -180,9 +194,17 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			join_(k, h, forest);
 			num_join_++;
 
-			if(!forest.atomic || forest.trivial)
-				compose_q_.push({std::move(forest.vertices), std::move(forest.separator),
+			if(!forest.atomic || forest.trivial) {
+				compose_q_.push(feasible_composition{
+						copy_to_queue(forest.vertices, compose_memory_),
+						copy_to_queue(forest.separator, compose_memory_),
 						h, forest.trivial});
+				compose_memory_.seal();
+			}
+
+			free_in_queue(forest.vertices, join_memory_);
+			free_in_queue(forest.separator, join_memory_);
+			join_memory_.reclaim();
 		}
 
 		std::cerr << "    k = " << k << ", h = " << h << ": there are "
@@ -203,11 +225,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					return !comp.trivial && staged.trivial;
 				};
 
-				std::sort(comp.vertices.begin(), comp.vertices.end());
+				workset_.clear();
+				workset_.insert(workset_.end(), comp.vertices.begin(), comp.vertices.end());
+				std::sort(workset_.begin(), workset_.end());
 
-				auto it = staged_trees.find(vertex_span{comp.vertices});
+				auto it = staged_trees.find(vertex_span{workset_});
 				if(it == staged_trees.end()) {
-					staged_tree staged{copy_to_arena(comp.vertices, eternal_arena_),
+					staged_tree staged{copy_to_arena(workset_, eternal_arena_),
 							comp.h, comp.trivial};
 					vertex_span vs{staged.vertices}; // Careful with the move below.
 					staged_trees.emplace(vs, std::move(staged));
@@ -216,6 +240,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					it->second.trivial = comp.trivial;
 				}
 			}
+
+			free_in_queue(comp.vertices, compose_memory_);
+			free_in_queue(comp.prefix, compose_memory_);
+			compose_memory_.reclaim();
 		}
 
 		std::cerr << "    k = " << k << ", h = " << h
@@ -320,8 +348,10 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
 		workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
 		join_q_.push(feasible_forest{tree.vertices.front(), forest.idx,
-				std::move(workset_), std::move(separator_),
+				copy_to_queue(workset_, join_memory_),
+				copy_to_queue(separator_, join_memory_),
 				false, false});
+		join_memory_.seal();
 	}
 }
 
@@ -363,6 +393,10 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		workset_.clear();
 		workset_.insert(workset_.end(), comp.vertices.begin(), comp.vertices.end());
 		workset_.push_back(u);
-		compose_q_.push({std::move(workset_), std::move(separator_), comp.h + 1, comp.trivial});
+		compose_q_.push(feasible_composition{
+				copy_to_queue(workset_, compose_memory_),
+				copy_to_queue(separator_, compose_memory_),
+				comp.h + 1, comp.trivial});
+		compose_memory_.seal();
 	}
 }

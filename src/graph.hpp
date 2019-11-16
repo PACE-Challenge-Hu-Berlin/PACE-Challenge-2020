@@ -230,6 +230,11 @@ struct vertex_span {
 		return end_;
 	}
 
+	vertex front() const {
+		assert(begin_ != end_);
+		return *begin_;
+	}
+
 	const vertex *data() const {
 		return begin_;
 	}

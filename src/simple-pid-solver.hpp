@@ -16,7 +16,7 @@ struct simple_pid_solver {
 
 	struct feasible_tree {
 		size_t idx;
-		std::vector<vertex, arena_allocator<vertex>> vertices;
+		vertex_span vertices;
 		int h;
 	};
 
@@ -24,8 +24,8 @@ struct simple_pid_solver {
 		// Representative vertex, i.e., smallest vertex ID in any component.
 		vertex rv;
 		size_t idx;
-		std::vector<vertex> vertices;
-		std::vector<vertex> separator;
+		vertex_span vertices;
+		vertex_span separator;
 		// Forest only consists of a single tree.
 		bool atomic;
 		// Forest is atomic and the only tree is a path.
@@ -33,14 +33,14 @@ struct simple_pid_solver {
 	};
 
 	struct feasible_composition {
-		std::vector<vertex> vertices;
-		std::vector<vertex> prefix;
+		vertex_span vertices;
+		vertex_span prefix;
 		int h;
 		bool trivial;
 	};
 
 	struct staged_tree {
-		std::vector<vertex, arena_allocator<vertex>> vertices;
+		vertex_span vertices;
 		int h;
 		// Vertices can only be arranged in a path.
 		bool trivial;
@@ -62,6 +62,8 @@ private:
 
 	graph *g_;
 	memory_arena eternal_arena_;
+	queue_memory join_memory_;
+	queue_memory compose_memory_;
 	statistics stats_;
 
 	// Set of all feasible trees of height <= current h.
