@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <functional> // For std::hash.
 #include <vector>
 
 using vertex = unsigned int;
@@ -198,3 +199,60 @@ private:
 	std::vector<uint8_t> present_;
 	std::vector<std::vector<vertex>> adj_lists_;
 };
+
+// Lightweight reference to a set of vertices.
+struct vertex_span {
+	friend bool operator== (vertex_span vs1, vertex_span vs2) {
+		if(vs1.size() != vs2.size())
+			return false;
+		for(size_t i = 0; i < vs1.size(); i++)
+			if(vs1[i] != vs2[i])
+				return false;
+		return true;
+	}
+
+	vertex_span(const vertex *begin, const vertex *end)
+	: begin_{begin}, end_{end} { }
+
+	template<typename A>
+	vertex_span(const std::vector<vertex, A> &vec)
+	: begin_{vec.data()}, end_{vec.data() + vec.size()} { }
+
+	vertex operator[] (size_t i) const {
+		return begin_[i];
+	}
+
+	const vertex *begin() const {
+		return begin_;
+	}
+
+	const vertex *end() const {
+		return end_;
+	}
+
+	const vertex *data() const {
+		return begin_;
+	}
+
+	size_t size() const {
+		return end_ - begin_;
+	}
+
+private:
+	const vertex *begin_;
+	const vertex *end_;
+};
+
+namespace std {
+	template<>
+	struct hash<vertex_span> {
+		// Possibly the worst hash function ever imagined.
+		// TODO: Pick a reasonable hash function.
+		size_t operator() (vertex_span vs) const {
+			size_t hash = 0x12345678;
+			for(auto p = vs.begin(); p != vs.end(); ++p)
+				hash = 13 * hash + *p;
+			return hash;
+		}
+	};
+}
