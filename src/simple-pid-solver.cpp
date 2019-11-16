@@ -160,11 +160,12 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					separator_.push_back(w);
 				}
 
-			size_t idx = feasible_trees.size();
-			join_q_.push(feasible_forest{idx,
+			auto idx = feasible_trees.size();
+			join_q_.push(feasible_forest{g_->id_limit(), idx,
 					copy_from(staged.vertices), // Careful with the move below.
 					std::move(separator_), true, staged.trivial});
-			feasible_trees.push_back(feasible_tree{std::move(staged.vertices), staged.h});
+			vertex_span vs{staged.vertices}; // Careful with the move below.
+			feasible_trees.insert(vs, feasible_tree{idx, std::move(staged.vertices), staged.h});
 			sit = staged_trees.erase(sit);
 		}
 
@@ -221,8 +222,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< ": staged " << staged_trees.size() << " trees"
 				<< " (" << num_join_ << " joins, " << num_compose_ << " compositions)"
 				<< std::endl;
-		std::cerr << "    non-disjoint objects: " << stats_.num_non_disjoint
-				<< ", non-separated: " << stats_.num_non_separated
+		std::cerr << "    unordered joins: " << stats_.num_unordered_joins
 				<< ", empty separator: " << stats_.num_empty_separator << std::endl;
 		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
 				<< ", allocations: " << eternal_arena_.num_allocations()
@@ -237,13 +237,17 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			++sit;
 			continue;
 		}
-		feasible_trees.push_back(feasible_tree{std::move(staged.vertices), staged.h});
+
+		auto idx = feasible_trees.size();
+		vertex_span vs{staged.vertices}; // Careful with the move below.
+		feasible_trees.insert(vs, feasible_tree{idx, std::move(staged.vertices), staged.h});
 		sit = staged_trees.erase(sit);
 	}
 
-	for(const auto &tree : feasible_trees)
+	for(feasible_tree &tree : feasible_trees) {
 		if(tree.vertices.size() == g_->num_vertices())
 			return true;
+	}
 	return false;
 }
 
@@ -265,53 +269,38 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 	}
 
-	for(size_t i = 0; i < forest.idx; i++) {
+	auto non_disjoint_predicate = [&] (vertex v) {
+		return pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v);
+	};
+	for(feasible_tree &tree : feasible_trees.disjoint_less(sieve_query_,
+				forest.rv, non_disjoint_predicate)) {
 		// We only need to join forests with smaller indices into this forest.
-		const auto &tree = feasible_trees[i];
+		if(tree.idx >= forest.idx) {
+			++stats_.num_unordered_joins;
+			continue;
+		}
 
 		int num_total_neighbors = num_forest_neighbors;
 
-		// Helper function. Return true iff the forest and the tree are disjoint.
-		// Marks the vertices of the tree.
-		auto validate_tree_vertices = [&] () -> bool {
-			associate_marker_.reset(g_->id_limit());
-			associate_neighbor_marker_.reset(g_->id_limit());
-			for(vertex v : tree.vertices) {
-				associate_marker_.mark(v);
-				if(pivot_marker_.is_marked(v))
-					return false;
-			}
-			return true;
-		};
-
-		// Helper function. Return true iff the forest and the tree are separated.
-		// Marks the neighbors of the tree.
-		auto validate_tree_neighbors = [&] () -> bool {
-			for(vertex v : tree.vertices) {
-				for(vertex w : g_->neighbors(v)) {
-					if(pivot_marker_.is_marked(w))
-						return false;
-					if(associate_marker_.is_marked(w))
-						continue;
-					if(associate_neighbor_marker_.is_marked(w))
-						continue;
-					associate_neighbor_marker_.mark(w);
-					if(!pivot_neighbor_marker_.is_marked(w))
-						++num_total_neighbors;
-				}
-			}
-			return true;
-		};
-
 		// Determine the neighbors of the tree that we are trying to join.
-		// Do not join if the objects are not disjoint or not separated.
-		if(!validate_tree_vertices()) {
-			++stats_.num_non_disjoint;
-			continue;
+		associate_marker_.reset(g_->id_limit());
+		associate_neighbor_marker_.reset(g_->id_limit());
+		for(vertex v : tree.vertices) {
+			assert(!pivot_marker_.is_marked(v));
+			associate_marker_.mark(v);
 		}
-		if(!validate_tree_neighbors()) {
-			++stats_.num_non_separated;
-			continue;
+
+		for(vertex v : tree.vertices) {
+			for(vertex w : g_->neighbors(v)) {
+				assert(!pivot_marker_.is_marked(w));
+				if(associate_marker_.is_marked(w))
+					continue;
+				if(associate_neighbor_marker_.is_marked(w))
+					continue;
+				associate_neighbor_marker_.mark(w);
+				if(!pivot_neighbor_marker_.is_marked(w))
+					++num_total_neighbors;
+			}
 		}
 
 		if(h + num_total_neighbors > k)
@@ -330,7 +319,8 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		workset_.clear();
 		workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
 		workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
-		join_q_.push(feasible_forest{forest.idx, std::move(workset_), std::move(separator_),
+		join_q_.push(feasible_forest{tree.vertices.front(), forest.idx,
+				std::move(workset_), std::move(separator_),
 				false, false});
 	}
 }

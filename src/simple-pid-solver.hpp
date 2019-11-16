@@ -3,23 +3,26 @@
 #include <queue>
 #include <unordered_map>
 
+#include "block-sieve.hpp"
 #include "data-structures.hpp"
 #include "graph.hpp"
 #include "mm.hpp"
 
 struct simple_pid_solver {
 	struct statistics {
-		int64_t num_non_disjoint = 0;
-		int64_t num_non_separated = 0;
+		int64_t num_unordered_joins = 0;
 		int64_t num_empty_separator = 0;
 	};
 
 	struct feasible_tree {
+		size_t idx;
 		std::vector<vertex, arena_allocator<vertex>> vertices;
 		int h;
 	};
 
 	struct feasible_forest {
+		// Representative vertex, i.e., smallest vertex ID in any component.
+		vertex rv;
 		size_t idx;
 		std::vector<vertex> vertices;
 		std::vector<vertex> separator;
@@ -62,7 +65,7 @@ private:
 	statistics stats_;
 
 	// Set of all feasible trees of height <= current h.
-	std::vector<feasible_tree> feasible_trees;
+	block_sieve<feasible_tree> feasible_trees;
 
 	// (Incomplete) set of feasible trees of height > current h.
 	std::unordered_map<vertex_span, staged_tree> staged_trees;
@@ -72,6 +75,7 @@ private:
 	std::queue<feasible_composition> compose_q_;
 
 	// Auxiliary data structures to compute neighbor sets and separators etc.
+	block_sieve_query<feasible_tree> sieve_query_;
 	boolean_marker pivot_marker_;
 	boolean_marker pivot_neighbor_marker_;
 	boolean_marker associate_marker_;
