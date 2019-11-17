@@ -188,6 +188,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 
 		num_join_ = 0;
 		num_compose_ = 0;
+		num_stage_ = 0;
+		num_unimproved_ = 0;
 		std::cerr << "    k = " << k << ", h = " << h << ": there are "
 				<< inactive_trees.size() << " inactive trees" << std::endl;
 		std::cerr << "    k = " << k << ", h = " << h << ": there are "
@@ -236,13 +238,17 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 
 				auto it = staged_trees.find(vertex_span{workset_});
 				if(it == staged_trees.end()) {
+					++num_stage_;
 					staged_tree staged{copy_to_arena(workset_, eternal_arena_),
 							comp.h, comp.trivial};
 					vertex_span vs{staged.vertices}; // Careful with the move below.
 					staged_trees.emplace(vs, std::move(staged));
 				}else if(improves_staged(it->second)) {
+					++num_stage_;
 					it->second.h = comp.h;
 					it->second.trivial = comp.trivial;
+				}else{
+					++num_unimproved_;
 				}
 			}
 
@@ -251,10 +257,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			compose_memory_.reclaim();
 		}
 
-		std::cerr << "    staged " << staged_trees.size() << " trees"
+		std::cerr << "    staged " << num_stage_
+				<< " trees, discarded " << num_unimproved_
 				<< " (" << num_join_ << " joins, " << num_compose_ << " compositions)"
 				<< std::endl;
 		std::cerr << "    empty separator: " << stats_.num_empty_separator << std::endl;
+		std::cerr << "    pruned forests: " << stats_.num_pruned_forests
+				<< ", compositions: " << stats_.num_pruned_compositions << std::endl;
 		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
 				<< ", allocations: " << eternal_arena_.num_allocations()
 				<< std::endl;
@@ -331,8 +340,10 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 			}
 		}
 
-		if(h + num_total_neighbors > k)
+		if(h + num_total_neighbors > k) {
+			++stats_.num_pruned_forests;
 			return;
+		}
 
 		separator_.clear();
 		for(vertex v : forest.separator)
@@ -409,8 +420,10 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 			++num_composed_neighbors;
 		}
 
-		if(comp.h + 1 + num_composed_neighbors > k)
+		if(comp.h + 1 + num_composed_neighbors > k) {
+			++stats_.num_pruned_compositions;
 			continue;
+		}
 
 		separator_.clear();
 		for(vertex v : comp.prefix)

@@ -11,6 +11,8 @@
 struct simple_pid_solver {
 	struct statistics {
 		int64_t num_empty_separator = 0;
+		int64_t num_pruned_forests = 0;
+		int64_t num_pruned_compositions = 0;
 	};
 
 	struct feasible_tree {
@@ -90,4 +92,6 @@ private:
 
 	int64_t num_join_;
 	int64_t num_compose_;
+	int64_t num_stage_;
+	int64_t num_unimproved_;
 };
