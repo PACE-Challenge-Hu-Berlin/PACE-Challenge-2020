@@ -140,8 +140,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		workset_.clear();
 		workset_.push_back(v);
 		staged_tree staged{copy_to_arena(workset_, eternal_arena_), 1, true};
-		vertex_span vs{staged.vertices}; // Careful with the move below.
-		staged_trees.emplace(vs, std::move(staged));
+		staged_trees.emplace(staged.vertices, staged);
 	}
 
 	for(int h = 1; h < k; h++) {
@@ -181,8 +180,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial});
 			join_memory_.seal();
-			vertex_span vs{staged.vertices}; // Careful with the move below.
-			active_trees.insert(vs, feasible_tree{std::move(staged.vertices), staged.h});
+			active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
 			sit = staged_trees.erase(sit);
 		}
 
@@ -196,7 +194,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< join_q_.size() << " initial forests" << std::endl;
 
 		while(!join_q_.empty()) {
-			feasible_forest forest = std::move(join_q_.front());
+			feasible_forest forest = join_q_.front();
 			join_q_.pop();
 			join_(k, h, forest);
 			num_join_++;
@@ -218,7 +216,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< compose_q_.size() << " initial compositions" << std::endl;
 
 		while(!compose_q_.empty()) {
-			feasible_composition comp = std::move(compose_q_.front());
+			feasible_composition comp = compose_q_.front();
 			compose_q_.pop();
 			compose_(k, h, comp);
 			num_compose_++;
@@ -241,8 +239,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					++num_stage_;
 					staged_tree staged{copy_to_arena(workset_, eternal_arena_),
 							comp.h, comp.trivial};
-					vertex_span vs{staged.vertices}; // Careful with the move below.
-					staged_trees.emplace(vs, std::move(staged));
+					staged_trees.emplace(staged.vertices, staged);
 				}else if(improves_staged(it->second)) {
 					++num_stage_;
 					it->second.h = comp.h;
@@ -282,8 +279,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			continue;
 		}
 
-		vertex_span vs{staged.vertices}; // Careful with the move below.
-		active_trees.insert(vs, feasible_tree{std::move(staged.vertices), staged.h});
+		active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
 		sit = staged_trees.erase(sit);
 	}
 
