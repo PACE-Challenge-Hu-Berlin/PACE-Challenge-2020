@@ -199,14 +199,6 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			join_(k, h, forest);
 			num_join_++;
 
-			if(!forest.atomic || forest.trivial) {
-				compose_q_.push(feasible_composition{
-						copy_to_queue(forest.vertices, compose_memory_),
-						copy_to_queue(forest.separator, compose_memory_),
-						h, forest.trivial});
-				compose_memory_.seal();
-			}
-
 			free_in_queue(forest.vertices, join_memory_);
 			free_in_queue(forest.separator, join_memory_);
 			join_memory_.reclaim();
@@ -362,6 +354,14 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 				forest.max_rv, non_disjoint_predicate)) {
 		auto rv = tree.vertices.front();
 		join_with(tree, forest.min_rv, rv);
+	}
+
+	if(!forest.atomic || forest.trivial) {
+		compose_q_.push(feasible_composition{
+				copy_to_queue(forest.vertices, compose_memory_),
+				copy_to_queue(forest.separator, compose_memory_),
+				h, forest.trivial});
+		compose_memory_.seal();
 	}
 }
 
