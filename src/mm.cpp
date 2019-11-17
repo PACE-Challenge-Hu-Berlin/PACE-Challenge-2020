@@ -17,10 +17,11 @@ namespace {
 	}
 
 	unsigned long ceil2pow(unsigned long x) {
+		static_assert(sizeof(unsigned long) == 8, "unexpected sizeof(long)");
 		if(x <= 1)
 			return 1;
 		assert(x <= ((UINT64_MAX / 2) + 1));
-		return (1 << (64 - __builtin_clzl(x - 1)));
+		return (1UL << (64 - __builtin_clzl(x - 1)));
 	}
 
 	// Ridiculously large virtual memory area.
