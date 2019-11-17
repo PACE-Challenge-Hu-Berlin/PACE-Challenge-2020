@@ -152,8 +152,19 @@ public:
 	}
 
 	void seal() {
-		// TODO: Handle zero allocations per seal().
-		assert(!slices_.empty());
+		// Handle the zero allocation case.
+		if(!seal_ptr_) {
+			if(slices_.empty() || slices_.back().frontier_limit < SIZE_MAX)
+				open_chunk_();
+
+			size_t head_offset = (frontier_ + alignof(chunk) - 1) & ~(alignof(chunk) - 1);
+			size_t n_frontier = head_offset + sizeof(chunk);
+			if(commit_limit_ < n_frontier)
+				commit_(n_frontier);
+			seal_ptr_ = slices_.back().base + head_offset;
+			used_space_ += n_frontier - frontier_;
+			max_used_space_ = std::max(max_used_space_, used_space_);
+		}
 
 		new (seal_ptr_) chunk{frontier_};
 		seal_ptr_ = nullptr;

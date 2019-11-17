@@ -58,6 +58,12 @@ struct simple_pid_solver {
 	}
 
 private:
+	enum class ownership {
+		none,
+		owned,
+		borrowed
+	};
+
 	bool decide_treedepth_(int k);
 	void join_(int k, int h, feasible_forest &forest);
 	void compose_(int k, int h, feasible_composition &comp);
@@ -78,8 +84,8 @@ private:
 	std::unordered_map<vertex_span, staged_tree> staged_trees;
 
 	// Queues to process newly found feasible forests and feasible compositions.
-	std::queue<feasible_forest> join_q_;
-	std::queue<feasible_composition> compose_q_;
+	std::queue<std::pair<feasible_forest, ownership>> join_q_;
+	std::queue<std::pair<feasible_composition, ownership>> compose_q_;
 
 	// Auxiliary data structures to compute neighbor sets and separators etc.
 	block_sieve_query<feasible_tree> sieve_query_;

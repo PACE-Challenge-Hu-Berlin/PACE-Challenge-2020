@@ -175,10 +175,9 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				}
 
 			auto rv = staged.vertices.front();
-			join_q_.push(feasible_forest{rv, rv,
-					copy_to_queue(staged.vertices, join_memory_),
+			join_q_.push({feasible_forest{rv, rv, staged.vertices,
 					copy_to_queue(separator_, join_memory_),
-					true, staged.trivial});
+					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
 			active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
 			sit = staged_trees.erase(sit);
@@ -194,22 +193,26 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< join_q_.size() << " initial forests" << std::endl;
 
 		while(!join_q_.empty()) {
-			feasible_forest forest = join_q_.front();
+			feasible_forest forest = join_q_.front().first;
+			ownership forest_ownership = compose_q_.front().second;
 			join_q_.pop();
 			join_(k, h, forest);
 			num_join_++;
 
 			while(!compose_q_.empty()) {
-				feasible_composition comp = compose_q_.front();
+				feasible_composition comp = compose_q_.front().first;
+				ownership comp_ownership = compose_q_.front().second;
 				compose_q_.pop();
 				compose_(k, h, comp);
 				num_compose_++;
 
-				free_in_queue(comp.prefix, compose_memory_);
+				if(comp_ownership == ownership::owned)
+					free_in_queue(comp.prefix, compose_memory_);
 				compose_memory_.reclaim();
 			}
 
-			free_in_queue(forest.vertices, join_memory_);
+			if(forest_ownership == ownership::owned)
+				free_in_queue(forest.vertices, join_memory_);
 			free_in_queue(forest.separator, join_memory_);
 			join_memory_.reclaim();
 		}
@@ -318,10 +321,10 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		workset_.clear();
 		workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
 		workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
-		join_q_.push(feasible_forest{min_rv, max_rv,
+		join_q_.push({feasible_forest{min_rv, max_rv,
 				copy_to_queue(workset_, join_memory_),
 				copy_to_queue(separator_, join_memory_),
-				false, false});
+				false, false}, ownership::owned});
 		join_memory_.seal();
 	};
 
@@ -353,9 +356,8 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	}
 
 	if(!forest.atomic || forest.trivial) {
-		compose_q_.push(feasible_composition{forest.vertices,
-				copy_to_queue(forest.separator, compose_memory_),
-				h, forest.trivial});
+		compose_q_.push({feasible_composition{forest.vertices, forest.separator,
+				h, forest.trivial}, ownership::borrowed});
 		compose_memory_.seal();
 	}
 }
@@ -426,9 +428,9 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 			++num_unimproved_;
 		}
 
-		compose_q_.push(feasible_composition{it->second.vertices,
+		compose_q_.push({feasible_composition{it->second.vertices,
 				copy_to_queue(separator_, compose_memory_),
-				comp.h + 1, comp.trivial});
+				comp.h + 1, comp.trivial}, ownership::owned});
 		compose_memory_.seal();
 	}
 }
