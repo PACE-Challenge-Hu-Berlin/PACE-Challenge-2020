@@ -22,6 +22,12 @@ private:
 		unsigned int plen = 0;
 	};
 
+	enum class comparator {
+		none,
+		less,
+		greater
+	};
+
 public:
 	// Query state, required for disjoint_less().
 	// Only one operation can use an object of this class at a time.
@@ -81,16 +87,16 @@ private:
 
 	// Range that contains all vertex sets that are
 	//     (1) disjoint w.r.t. the given membership predicate
-	// and (2) have a representative (= smallest vertex) less than the given vertex.
+	// and (2) have a representative (= smallest vertex) satisfying the given comparison.
 	// Note: the iterators of this range are *single pass* only.
 	// Also note that the range requires a (mutable) query state.
 	// Space complexity: O(n^2) where n is the number of vertices.
-	template<typename C>
-	struct disjoint_less_range {
+	template<comparator Cmp, typename C>
+	struct disjoint_range {
 		struct sentinel { };
 
 		struct iterator {
-			explicit iterator(disjoint_less_range *range)
+			explicit iterator(disjoint_range *range)
 			: range_{range} { }
 
 			bool operator== (sentinel) const {
@@ -110,19 +116,19 @@ private:
 			}
 
 		private:
-			disjoint_less_range *range_;
+			disjoint_range *range_;
 		};
 
-		disjoint_less_range(block_sieve &sieve, query &query, vertex rv, C contains)
+		disjoint_range(block_sieve &sieve, query &query, vertex rv, C contains)
 		: sieve_{&sieve}, query_{&query}, rv_{rv}, contains_{contains} {
 			query_->stack.clear();
 			query_->stack.push_back({sieve_->root_, 0});
 			skip_();
 		}
 
-		disjoint_less_range(const disjoint_less_range &) = delete;
+		disjoint_range(const disjoint_range &) = delete;
 
-		disjoint_less_range &operator= (const disjoint_less_range &) = delete;
+		disjoint_range &operator= (const disjoint_range &) = delete;
 
 		iterator begin() {
 			return iterator{this};
@@ -164,9 +170,17 @@ private:
 
 			while(true) {
 				while(cur_) {
-					if(cur_->vs[0] >= rv_) {
-						cur_ = nullptr;
-						break;
+					if(Cmp == comparator::less) {
+						if(cur_->vs[0] >= rv_) {
+							cur_ = nullptr;
+							break;
+						}
+					}else{
+						assert(Cmp == comparator::greater);
+						if(cur_->vs[0] <= rv_) {
+							cur_ = cur_->next;
+							continue;
+						}
 					}
 
 					if(range_disjoint(pfx_, cur_->plen)) {
@@ -327,7 +341,12 @@ public:
 	}
 
 	template<typename C>
-	disjoint_less_range<C> disjoint_less(query &query, vertex rv, C contains) {
+	disjoint_range<comparator::less, C> disjoint_less(query &query, vertex rv, C contains) {
+		return {*this, query, rv, contains};
+	}
+
+	template<typename C>
+	disjoint_range<comparator::greater, C> disjoint_greater(query &query, vertex rv, C contains) {
 		return {*this, query, rv, contains};
 	}
 

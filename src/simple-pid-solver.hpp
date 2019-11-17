@@ -10,20 +10,20 @@
 
 struct simple_pid_solver {
 	struct statistics {
-		int64_t num_unordered_joins = 0;
 		int64_t num_empty_separator = 0;
 	};
 
 	struct feasible_tree {
-		size_t idx;
 		vertex_span vertices;
 		int h;
 	};
 
 	struct feasible_forest {
-		// Representative vertex, i.e., smallest vertex ID in any component.
-		vertex rv;
-		size_t idx;
+		// A representative of a component is the vertex with smallest vertex ID in that component.
+		// As the representatives are ordered (by their vertex ID), they induce an order
+		// on the component.
+		vertex min_rv; // Minimal representative of all components.
+		vertex max_rv; // Maximal representative of all components.
 		vertex_span vertices;
 		vertex_span separator;
 		// Forest only consists of a single tree.
@@ -66,8 +66,11 @@ private:
 	queue_memory compose_memory_;
 	statistics stats_;
 
-	// Set of all feasible trees of height <= current h.
-	block_sieve<feasible_tree> feasible_trees;
+	// The following data structure store all feasible trees of height <= current h.
+	// Set of trees that are currently being expanded. Those have height == current h.
+	block_sieve<feasible_tree> active_trees;
+	// Set of trees that were already expanded. Those have height < current h.
+	block_sieve<feasible_tree> inactive_trees;
 
 	// (Incomplete) set of feasible trees of height > current h.
 	std::unordered_map<vertex_span, staged_tree> staged_trees;

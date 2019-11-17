@@ -125,9 +125,12 @@ int simple_pid_solver::compute_treedepth() {
 }
 
 bool simple_pid_solver::decide_treedepth_(int k) {
-	for(const feasible_tree &tree : feasible_trees)
+	for(const feasible_tree &tree : active_trees)
 		free_in_arena(tree.vertices, eternal_arena_);
-	feasible_trees.clear();
+	for(const feasible_tree &tree : inactive_trees)
+		free_in_arena(tree.vertices, eternal_arena_);
+	active_trees.clear();
+	inactive_trees.clear();
 	staged_trees.clear();
 	eternal_arena_.reset();
 
@@ -172,19 +175,21 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					separator_.push_back(w);
 				}
 
-			auto idx = feasible_trees.size();
-			join_q_.push(feasible_forest{g_->id_limit(), idx,
+			auto rv = staged.vertices.front();
+			join_q_.push(feasible_forest{rv, rv,
 					copy_to_queue(staged.vertices, join_memory_),
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial});
 			join_memory_.seal();
 			vertex_span vs{staged.vertices}; // Careful with the move below.
-			feasible_trees.insert(vs, feasible_tree{idx, std::move(staged.vertices), staged.h});
+			active_trees.insert(vs, feasible_tree{std::move(staged.vertices), staged.h});
 			sit = staged_trees.erase(sit);
 		}
 
 		num_join_ = 0;
 		num_compose_ = 0;
+		std::cerr << "    k = " << k << ", h = " << h << ": there are "
+				<< inactive_trees.size() << " inactive trees" << std::endl;
 		std::cerr << "    k = " << k << ", h = " << h << ": there are "
 				<< join_q_.size() << " initial forests" << std::endl;
 
@@ -246,15 +251,17 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			compose_memory_.reclaim();
 		}
 
-		std::cerr << "    k = " << k << ", h = " << h
-				<< ": staged " << staged_trees.size() << " trees"
+		std::cerr << "    staged " << staged_trees.size() << " trees"
 				<< " (" << num_join_ << " joins, " << num_compose_ << " compositions)"
 				<< std::endl;
-		std::cerr << "    unordered joins: " << stats_.num_unordered_joins
-				<< ", empty separator: " << stats_.num_empty_separator << std::endl;
+		std::cerr << "    empty separator: " << stats_.num_empty_separator << std::endl;
 		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
 				<< ", allocations: " << eternal_arena_.num_allocations()
 				<< std::endl;
+
+		for(const feasible_tree &tree : active_trees)
+			inactive_trees.insert(tree.vertices, tree);
+		active_trees.clear();
 	}
 
 	// Move trees for the final h from the staging buffer to the set of feasible trees.
@@ -266,13 +273,16 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			continue;
 		}
 
-		auto idx = feasible_trees.size();
 		vertex_span vs{staged.vertices}; // Careful with the move below.
-		feasible_trees.insert(vs, feasible_tree{idx, std::move(staged.vertices), staged.h});
+		active_trees.insert(vs, feasible_tree{std::move(staged.vertices), staged.h});
 		sit = staged_trees.erase(sit);
 	}
 
-	for(feasible_tree &tree : feasible_trees) {
+	for(feasible_tree &tree : active_trees) {
+		if(tree.vertices.size() == g_->num_vertices())
+			return true;
+	}
+	for(feasible_tree &tree : inactive_trees) {
 		if(tree.vertices.size() == g_->num_vertices())
 			return true;
 	}
@@ -297,17 +307,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 	}
 
-	auto non_disjoint_predicate = [&] (vertex v) {
-		return pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v);
-	};
-	for(feasible_tree &tree : feasible_trees.disjoint_less(sieve_query_,
-				forest.rv, non_disjoint_predicate)) {
-		// We only need to join forests with smaller indices into this forest.
-		if(tree.idx >= forest.idx) {
-			++stats_.num_unordered_joins;
-			continue;
-		}
-
+	auto join_with = [&] (const feasible_tree &tree, vertex min_rv, vertex max_rv) {
 		int num_total_neighbors = num_forest_neighbors;
 
 		// Determine the neighbors of the tree that we are trying to join.
@@ -332,7 +332,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 
 		if(h + num_total_neighbors > k)
-			continue;
+			return;
 
 		separator_.clear();
 		for(vertex v : forest.separator)
@@ -341,17 +341,44 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 
 		if(!separator_.size()) {
 			++stats_.num_empty_separator;
-			continue;
+			return;
 		}
 
 		workset_.clear();
 		workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
 		workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
-		join_q_.push(feasible_forest{tree.vertices.front(), forest.idx,
+		join_q_.push(feasible_forest{min_rv, max_rv,
 				copy_to_queue(workset_, join_memory_),
 				copy_to_queue(separator_, join_memory_),
 				false, false});
 		join_memory_.seal();
+	};
+
+	auto non_disjoint_predicate = [&] (vertex v) {
+		return pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v);
+	};
+
+	// To avoid duplicate joins, we only join trees into this forest that either
+	//    - are ordered before all components of this forest,
+	// or - are ordered after all components of this forest
+	// w.r.t. the order induced by representative vertices.
+
+	// Join only lesser active trees into this forest.
+	for(feasible_tree &tree : active_trees.disjoint_less(sieve_query_,
+				forest.min_rv, non_disjoint_predicate)) {
+		auto rv = tree.vertices.front();
+		join_with(tree, rv, forest.max_rv);
+	}
+	// Join both lesser and greater inactive trees into this forest.
+	for(feasible_tree &tree : inactive_trees.disjoint_less(sieve_query_,
+				forest.min_rv, non_disjoint_predicate)) {
+		auto rv = tree.vertices.front();
+		join_with(tree, rv, forest.max_rv);
+	}
+	for(feasible_tree &tree : inactive_trees.disjoint_greater(sieve_query_,
+				forest.max_rv, non_disjoint_predicate)) {
+		auto rv = tree.vertices.front();
+		join_with(tree, forest.min_rv, rv);
 	}
 }
 
