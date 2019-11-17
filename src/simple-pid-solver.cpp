@@ -199,23 +199,20 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			join_(k, h, forest);
 			num_join_++;
 
+			while(!compose_q_.empty()) {
+				feasible_composition comp = compose_q_.front();
+				compose_q_.pop();
+				compose_(k, h, comp);
+				num_compose_++;
+
+				free_in_queue(comp.vertices, compose_memory_);
+				free_in_queue(comp.prefix, compose_memory_);
+				compose_memory_.reclaim();
+			}
+
 			free_in_queue(forest.vertices, join_memory_);
 			free_in_queue(forest.separator, join_memory_);
 			join_memory_.reclaim();
-		}
-
-		std::cerr << "    k = " << k << ", h = " << h << ": there are "
-				<< compose_q_.size() << " initial compositions" << std::endl;
-
-		while(!compose_q_.empty()) {
-			feasible_composition comp = compose_q_.front();
-			compose_q_.pop();
-			compose_(k, h, comp);
-			num_compose_++;
-
-			free_in_queue(comp.vertices, compose_memory_);
-			free_in_queue(comp.prefix, compose_memory_);
-			compose_memory_.reclaim();
 		}
 
 		std::cerr << "    staged " << num_stage_
