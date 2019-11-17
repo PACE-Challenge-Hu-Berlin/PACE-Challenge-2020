@@ -91,6 +91,7 @@ void memory_arena::extend(size_t threshold) {
 void memory_arena::reset() {
 	assert(!live_);
 	uncommit_vm(base_, limit_);
+	frontier_ = 0;
 	limit_ = 0;
 	num_allocations_ = 0;
 }
