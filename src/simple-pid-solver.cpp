@@ -30,27 +30,6 @@ namespace {
 		const simple_pid_solver::feasible_composition *p_;
 	};
 
-	struct print_memory {
-		friend std::ostream &operator<< (std::ostream &os, const print_memory &self) {
-			if(self.n_ > 10 * (size_t(1) << 30)) {
-				os << self.n_ << " GiB";
-			}else if(self.n_ >= 10 * (size_t(1) << 20)) {
-				os << (self.n_ >> 20) << " MiB";
-			}else if(self.n_ > 10 * (size_t(1) << 10)) {
-				os << (self.n_ >> 10) << " KiB";
-			}else{
-				os << self.n_ << " B";
-			}
-			return os;
-		}
-
-		print_memory(size_t n)
-		: n_{n} { }
-
-	private:
-		size_t n_;
-	};
-
 	template<typename C>
 	vertex_span copy_to_arena(const C &vec, memory_arena &memory) {
 		arena_allocator<vertex> alloc{memory};
@@ -98,8 +77,19 @@ int simple_pid_solver::compute_treedepth() {
 		int k = 0;
 		std::cerr << "solving CC " << (i + 1) << " of " << cc.num_components() << std::endl;
 		while(true) {
-			if(decide_treedepth_(k))
-				break;
+			try {
+				if(decide_treedepth_(k))
+					break;
+			} catch(const std::bad_alloc &) {
+				std::cout << "allocation failure in simple-pid solver\n"
+						<< "    eternal memory is at: "
+						<< print_memory(eternal_arena_.used_space()) << "\n"
+						<< "    join memory is at: "
+						<< print_memory(join_memory_.used_space()) << "\n"
+						<< "    compose memory is at: "
+						<< print_memory(compose_memory_.used_space()) << std::endl;
+				throw;
+			}
 			k++;
 		}
 		td = std::max(td, k);

@@ -3,6 +3,30 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <iostream>
+
+struct print_memory {
+	friend std::ostream &operator<< (std::ostream &os, const print_memory &self) {
+		if(self.n_ >= 10 * (size_t(1) << 30)) {
+			os << self.n_ << " GiB";
+		}else if(self.n_ >= 10 * (size_t(1) << 20)) {
+			os << (self.n_ >> 20) << " MiB";
+		}else if(self.n_ > 10 * (size_t(1) << 10)) {
+			os << (self.n_ >> 10) << " KiB";
+		}else{
+			os << self.n_ << " B";
+		}
+		return os;
+	}
+
+	print_memory(size_t n)
+	: n_{n} { }
+
+private:
+	size_t n_;
+};
+
+// --------------------------------------------------------------------------------------
 
 // Memory area that is always freed entirely at once.
 struct memory_arena {
@@ -196,6 +220,10 @@ public:
 			reclaim_chunk_ = reinterpret_cast<chunk *>(slices_.front().base + head_offset);
 			accounting_limit_ = rc_limit;
 		}
+	}
+
+	size_t used_space() {
+		return used_space_;
 	}
 
 	size_t max_used_space() {

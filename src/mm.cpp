@@ -29,13 +29,14 @@ namespace {
 	// Prefer 2 MiB pages.
 	static constexpr size_t page_size = 0x200000;
 
-	void *reserve_vm(size_t size) {
+	bool reserve_vm(size_t size, void *&window) {
 		// PROT_NONE areas do not count towards overcommitting.
 		// There is also MAP_NORESERVE to disable overcomitting heuristics.
-		auto window = mmap(nullptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		if(window == MAP_FAILED)
-			throw std::bad_alloc{};
-		return window;
+		auto res = mmap(nullptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if(res == MAP_FAILED)
+			return false;
+		window = res;
+		return true;
 	}
 
 	void unreserve_vm(void *window, size_t size) {
@@ -45,9 +46,10 @@ namespace {
 		}
 	}
 
-	void commit_vm(void *window, size_t size) {
+	bool commit_vm(void *window, size_t size) {
 		if(mprotect(window, size, PROT_READ | PROT_WRITE))
-			throw std::bad_alloc{};
+			return false;
+		return true;
 	}
 
 	void uncommit_vm(void *window, size_t size) {
@@ -62,7 +64,12 @@ namespace {
 // --------------------------------------------------------------------------------------
 
 memory_arena::memory_arena() {
-	base_ = reinterpret_cast<char *>(reserve_vm(vspace));
+	void *base_ptr;
+	if(!reserve_vm(vspace, base_ptr)) {
+		std::cerr << "failed to reserve virtual memory for memory arena" << std::endl;
+		throw std::bad_alloc{};
+	}
+	base_ = reinterpret_cast<char *>(base_ptr);
 }
 
 memory_arena::~memory_arena() {
@@ -73,7 +80,10 @@ void memory_arena::extend(size_t threshold) {
 	if(threshold <= limit_)
 		return;
 	threshold = ceil2pow(threshold);
-	commit_vm(base_, threshold);
+	if(!commit_vm(base_, threshold)) {
+		std::cerr << "failed to extend memory arena to " << print_memory(threshold) << std::endl;
+		throw std::bad_alloc{};
+	}
 	limit_ = threshold;
 }
 
@@ -99,8 +109,12 @@ queue_memory::~queue_memory() {
 void queue_memory::open_chunk_() {
 	assert(!seal_ptr_);
 
-	auto base = reinterpret_cast<char *>(reserve_vm(vspace));
-	slices_.push_back(slice{base});
+	void *base_ptr;
+	if(!reserve_vm(vspace, base_ptr)) {
+		std::cerr << "failed to reserve virtual memory for queue memory" << std::endl;
+		throw std::bad_alloc{};
+	}
+	slices_.push_back(slice{reinterpret_cast<char *>(base_ptr)});
 	frontier_ = 0;
 	commit_limit_ = 0;
 }
@@ -119,7 +133,10 @@ void queue_memory::commit_(size_t threshold) {
 
 	size_t lim = (threshold + commit_threshold + page_size - 1) & ~(page_size - 1);
 	assert(lim > commit_limit_);
-	commit_vm(slices_.back().base + commit_limit_, lim - commit_limit_);
+	if(!commit_vm(slices_.back().base + commit_limit_, lim - commit_limit_)) {
+		std::cerr << "failed to extend queue memory to " << print_memory(lim) << std::endl;
+		throw std::bad_alloc{};
+	}
 	commit_limit_ = lim;
 }
 
