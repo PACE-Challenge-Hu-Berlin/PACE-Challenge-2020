@@ -264,6 +264,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
 				<< ", allocations: " << eternal_arena_.num_allocations()
 				<< std::endl;
+		std::cerr << "    join memory: " << print_memory{join_memory_.max_used_space()}
+				<< std::endl;
+		std::cerr << "    compose memory: " << print_memory{compose_memory_.max_used_space()}
+				<< std::endl;
 
 		for(const feasible_tree &tree : active_trees)
 			inactive_trees.insert(tree.vertices, tree);

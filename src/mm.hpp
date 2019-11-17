@@ -131,6 +131,8 @@ public:
 			if(commit_limit_ < n_frontier)
 				commit_(n_frontier);
 			seal_ptr_ = slices_.back().base + head_offset;
+			used_space_ += n_frontier - frontier_;
+			max_used_space_ = std::max(max_used_space_, used_space_);
 			frontier_ = n_frontier;
 			return slices_.back().base + object_offset;
 		}else{
@@ -138,6 +140,8 @@ public:
 			size_t n_frontier = offset + size;
 			if(commit_limit_ < n_frontier)
 				commit_(n_frontier);
+			used_space_ += n_frontier - frontier_;
+			max_used_space_ = std::max(max_used_space_, used_space_);
 			frontier_ = n_frontier;
 			return slices_.back().base + offset;
 		}
@@ -167,16 +171,24 @@ public:
 		auto rc_limit = rc->limit;
 		rc->~chunk();
 
+		used_space_ -= rc_limit - accounting_limit_;
+
 		if(rc_limit == slices_.front().frontier_limit) {
 			close_chunk_();
 			reclaim_chunk_ = nullptr;
+			accounting_limit_ = 0;
 		}else{
 			assert(rc_limit < slices_.front().frontier_limit);
 			size_t head_offset = (rc_limit + alignof(chunk) - 1) & ~(alignof(chunk) - 1);
 			if(rc_limit > uncommit_limit_ + commit_threshold)
 				uncommit_(rc_limit);
 			reclaim_chunk_ = reinterpret_cast<chunk *>(slices_.front().base + head_offset);
+			accounting_limit_ = rc_limit;
 		}
+	}
+
+	size_t max_used_space() {
+		return max_used_space_;
 	}
 
 private:
@@ -192,6 +204,9 @@ private:
 	size_t frontier_ = 0;
 	size_t commit_limit_ = 0;
 	size_t uncommit_limit_ = 0;
+	size_t accounting_limit_ = 0;
+	size_t used_space_ = 0;
+	size_t max_used_space_ = 0;
 };
 
 template <class T>
