@@ -205,7 +205,6 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				compose_(k, h, comp);
 				num_compose_++;
 
-				free_in_queue(comp.vertices, compose_memory_);
 				free_in_queue(comp.prefix, compose_memory_);
 				compose_memory_.reclaim();
 			}
@@ -354,8 +353,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	}
 
 	if(!forest.atomic || forest.trivial) {
-		compose_q_.push(feasible_composition{
-				copy_to_queue(forest.vertices, compose_memory_),
+		compose_q_.push(feasible_composition{forest.vertices,
 				copy_to_queue(forest.separator, compose_memory_),
 				h, forest.trivial});
 		compose_memory_.seal();
@@ -417,7 +415,9 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 			++num_stage_;
 			staged_tree staged{copy_to_arena(workset_, eternal_arena_),
 					comp.h + 1, comp.trivial};
-			staged_trees.emplace(staged.vertices, staged);
+			bool success;
+			std::tie(it, success) = staged_trees.emplace(staged.vertices, staged);
+			assert(success);
 		}else if(improves_staged(it->second)) {
 			++num_stage_;
 			it->second.h = comp.h + 1;
@@ -426,8 +426,7 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 			++num_unimproved_;
 		}
 
-		compose_q_.push(feasible_composition{
-				copy_to_queue(workset_, compose_memory_),
+		compose_q_.push(feasible_composition{it->second.vertices,
 				copy_to_queue(separator_, compose_memory_),
 				comp.h + 1, comp.trivial});
 		compose_memory_.seal();
