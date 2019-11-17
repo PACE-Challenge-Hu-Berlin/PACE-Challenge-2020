@@ -221,34 +221,6 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			compose_(k, h, comp);
 			num_compose_++;
 
-			if(comp.h > h) {
-				auto improves_staged = [&] (const staged_tree &staged) {
-					if(comp.h < staged.h)
-						return true;
-					if(comp.h > staged.h)
-						return false;
-					return !comp.trivial && staged.trivial;
-				};
-
-				workset_.clear();
-				workset_.insert(workset_.end(), comp.vertices.begin(), comp.vertices.end());
-				std::sort(workset_.begin(), workset_.end());
-
-				auto it = staged_trees.find(vertex_span{workset_});
-				if(it == staged_trees.end()) {
-					++num_stage_;
-					staged_tree staged{copy_to_arena(workset_, eternal_arena_),
-							comp.h, comp.trivial};
-					staged_trees.emplace(staged.vertices, staged);
-				}else if(improves_staged(it->second)) {
-					++num_stage_;
-					it->second.h = comp.h;
-					it->second.trivial = comp.trivial;
-				}else{
-					++num_unimproved_;
-				}
-			}
-
 			free_in_queue(comp.vertices, compose_memory_);
 			free_in_queue(comp.prefix, compose_memory_);
 			compose_memory_.reclaim();
@@ -433,6 +405,30 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		workset_.clear();
 		workset_.insert(workset_.end(), comp.vertices.begin(), comp.vertices.end());
 		workset_.push_back(u);
+		std::sort(workset_.begin(), workset_.end());
+
+		auto improves_staged = [&] (const staged_tree &staged) {
+			if(comp.h + 1 < staged.h)
+				return true;
+			if(comp.h + 1 > staged.h)
+				return false;
+			return !comp.trivial && staged.trivial;
+		};
+
+		auto it = staged_trees.find(vertex_span{workset_});
+		if(it == staged_trees.end()) {
+			++num_stage_;
+			staged_tree staged{copy_to_arena(workset_, eternal_arena_),
+					comp.h + 1, comp.trivial};
+			staged_trees.emplace(staged.vertices, staged);
+		}else if(improves_staged(it->second)) {
+			++num_stage_;
+			it->second.h = comp.h + 1;
+			it->second.trivial = comp.trivial;
+		}else{
+			++num_unimproved_;
+		}
+
 		compose_q_.push(feasible_composition{
 				copy_to_queue(workset_, compose_memory_),
 				copy_to_queue(separator_, compose_memory_),
