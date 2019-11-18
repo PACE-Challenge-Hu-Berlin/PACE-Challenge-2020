@@ -55,10 +55,20 @@ namespace {
 
 	void uncommit_vm(void *window, size_t size) {
 		// TODO: should we also call mprotect to PROT_NONE the area again?
+#ifdef MADV_FREE
 		if(madvise(window, size, MADV_FREE)) {
-			std::cerr << "madvise(MADV_FREE) failure: cannot uncommit virtual memory" << std::endl;
+			std::cerr << "madvise(MADV_FREE) failure:"
+					" cannot uncommit virtual memory" << std::endl;
 			abort();
 		}
+#else
+#warning MADV_FREE is not available
+		if(madvise(window, size, MADV_DONTNEED)) {
+			std::cerr << "madvise(MADV_DONTNEED) failure:"
+					" cannot uncommit virtual memory" << std::endl;
+			abort();
+		}
+#endif
 	}
 };
 
