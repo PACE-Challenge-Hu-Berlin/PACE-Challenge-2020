@@ -137,8 +137,11 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "constructing k = " << k << ", h = " << h << std::endl;
 
 		// Move trees for the current h from the staging buffer to the set of feasible trees.
+		bool all_trees_inactive = true;
 		for(const auto &entry : staged_trees) {
 			const auto &staged = entry.second;
+			if(staged.h >= h)
+				all_trees_inactive = false;
 			if(staged.h != h)
 				continue;
 
@@ -166,17 +169,16 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
 		}
 
-		if(!active_trees.size())
+		if(all_trees_inactive)
 			break;
 
 		num_join_ = 0;
 		num_compose_ = 0;
 		num_stage_ = 0;
 		num_unimproved_ = 0;
-		std::cerr << "    k = " << k << ", h = " << h << ": there are "
+		std::cerr << "    there are "
+				<< active_trees.size() << " active trees, "
 				<< inactive_trees.size() << " inactive trees" << std::endl;
-		std::cerr << "    k = " << k << ", h = " << h << ": there are "
-				<< join_q_.size() << " initial forests" << std::endl;
 
 		while(!join_q_.empty()) {
 			feasible_forest forest = join_q_.front().first;
@@ -214,8 +216,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< ", allocations: " << eternal_arena_.num_allocations()
 				<< std::endl;
 		std::cerr << "    join memory: " << print_memory{join_memory_.max_used_space()}
-				<< std::endl;
-		std::cerr << "    compose memory: " << print_memory{compose_memory_.max_used_space()}
+				<< ", compose memory: " << print_memory{compose_memory_.max_used_space()}
 				<< std::endl;
 
 		for(const feasible_tree &tree : active_trees)
@@ -223,21 +224,9 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		active_trees.clear();
 	}
 
-	// Move trees for the final h from the staging buffer to the set of feasible trees.
 	for(const auto &entry : staged_trees) {
 		const auto &staged = entry.second;
-		if(staged.h != k)
-			continue;
-
-		active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
-	}
-
-	for(feasible_tree &tree : active_trees) {
-		if(tree.vertices.size() == g_->num_vertices())
-			return true;
-	}
-	for(feasible_tree &tree : inactive_trees) {
-		if(tree.vertices.size() == g_->num_vertices())
+		if(staged.vertices.size() == g_->num_vertices())
 			return true;
 	}
 	return false;
