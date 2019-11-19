@@ -134,19 +134,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	}
 
 	for(int h = 1; h < k; h++) {
-		if(staged_trees.empty())
-			break;
-
 		std::cerr << "constructing k = " << k << ", h = " << h << std::endl;
 
 		// Move trees for the current h from the staging buffer to the set of feasible trees.
-		auto sit = staged_trees.begin();
-		while(sit != staged_trees.end()) {
-			const auto &staged = sit->second;
-			if(staged.h != h) {
-				++sit;
+		for(const auto &entry : staged_trees) {
+			const auto &staged = entry.second;
+			if(staged.h != h)
 				continue;
-			}
 
 			// Find the neighbor set of the tree to turn it into an atomic forest.
 			pivot_marker_.reset(g_->id_limit());
@@ -170,8 +164,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
 			active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
-			sit = staged_trees.erase(sit);
 		}
+
+		if(!active_trees.size())
+			break;
 
 		num_join_ = 0;
 		num_compose_ = 0;
@@ -228,16 +224,12 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	}
 
 	// Move trees for the final h from the staging buffer to the set of feasible trees.
-	auto sit = staged_trees.begin();
-	while(sit != staged_trees.end()) {
-		const auto &staged = sit->second;
-		if(staged.h != k) {
-			++sit;
+	for(const auto &entry : staged_trees) {
+		const auto &staged = entry.second;
+		if(staged.h != k)
 			continue;
-		}
 
 		active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
-		sit = staged_trees.erase(sit);
 	}
 
 	for(feasible_tree &tree : active_trees) {
