@@ -330,6 +330,7 @@ public:
 				}
 			}
 		}
+		size_ = 0;
 	}
 
 	sieve_iterator begin() {
