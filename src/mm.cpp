@@ -5,25 +5,10 @@
 #include <new>
 #include <type_traits>
 
+#include "data-structures.hpp"
 #include "mm.hpp"
 
 namespace {
-	template<typename T>
-	struct dependent_false : std::false_type { };
-
-	template<typename T>
-	T ceil2pow(T x) {
-		static_assert(dependent_false<T>::value, "ceil2pow() is not implemented for this type");
-	}
-
-	unsigned long ceil2pow(unsigned long x) {
-		static_assert(sizeof(unsigned long) == 8, "unexpected sizeof(long)");
-		if(x <= 1)
-			return 1;
-		assert(x <= ((UINT64_MAX / 2) + 1));
-		return (1UL << (64 - __builtin_clzl(x - 1)));
-	}
-
 	// Ridiculously large virtual memory area.
 	static constexpr size_t vspace = 1024 * size_t(1024 * 1024 * 1024);
 
