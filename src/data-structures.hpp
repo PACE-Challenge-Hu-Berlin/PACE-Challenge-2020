@@ -32,8 +32,16 @@ template<typename T>
 struct dependent_false : std::false_type { };
 
 template<typename T>
-inline T ceil2pow(T x) {
-	static_assert(dependent_false<T>::value, "ceil2pow() is not implemented for this type");
+inline T bit_clz(T x) {
+	static_assert(dependent_false<T>::value, "bit_clz() is not implemented for this type");
+}
+
+inline unsigned int bit_clz(unsigned int x) {
+	return __builtin_clz(x);
+}
+
+inline unsigned long bit_clz(unsigned long x) {
+	return __builtin_clzl(x);
 }
 
 inline unsigned long ceil2pow(unsigned long x) {
@@ -41,5 +49,18 @@ inline unsigned long ceil2pow(unsigned long x) {
 	if(x <= 1)
 		return 1;
 	assert(x <= ((UINT64_MAX / 2) + 1));
-	return (1UL << (64 - __builtin_clzl(x - 1)));
+	return (1UL << (64 - bit_clz(x - 1)));
+}
+
+inline unsigned int log2int(unsigned int x) {
+	static_assert(sizeof(unsigned int) == 4, "unexpected sizeof(int)");
+	assert(x >= 1);
+	return (32 - bit_clz(x)) - 1;
+}
+
+inline unsigned int log_ceil2int(unsigned int x) {
+	static_assert(sizeof(unsigned int) == 4, "unexpected sizeof(int)");
+	if(x <= 1)
+		return 0;
+	return (32 - bit_clz(x - 1));
 }

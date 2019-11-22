@@ -115,12 +115,12 @@ int simple_pid_solver::compute_treedepth() {
 }
 
 bool simple_pid_solver::decide_treedepth_(int k) {
-	for(const feasible_tree &tree : active_trees)
-		free_in_arena(tree.vertices, eternal_arena_);
-	for(const feasible_tree &tree : inactive_trees)
-		free_in_arena(tree.vertices, eternal_arena_);
 	active_trees.clear();
 	inactive_trees.clear();
+	for(const auto &entry : staged_trees) {
+		const auto &staged = entry.second;
+		free_in_arena(staged.vertices, eternal_arena_);
+	}
 	staged_trees.clear();
 	eternal_arena_.reset();
 
@@ -166,7 +166,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
-			active_trees.insert(staged.vertices, feasible_tree{staged.vertices, staged.h});
+			active_trees.insert(*g_, staged.vertices, feasible_tree{staged.vertices, staged.h});
 		}
 
 		if(all_trees_inactive)
@@ -220,7 +220,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< std::endl;
 
 		for(const feasible_tree &tree : active_trees)
-			inactive_trees.insert(tree.vertices, tree);
+			inactive_trees.insert(*g_, tree.vertices, tree);
 		active_trees.clear();
 	}
 
@@ -299,8 +299,11 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		join_memory_.seal();
 	};
 
-	auto non_disjoint_predicate = [&] (vertex v) {
-		return pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v);
+	auto member_predicate = [&] (vertex v) {
+		return pivot_marker_.is_marked(v);
+	};
+	auto neighbor_predicate = [&] (vertex v) {
+		return pivot_neighbor_marker_.is_marked(v);
 	};
 
 	// To avoid duplicate joins, we only join trees into this forest that either
@@ -309,19 +312,22 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	// w.r.t. the order induced by representative vertices.
 
 	// Join only lesser active trees into this forest.
-	for(feasible_tree &tree : active_trees.disjoint_less(sieve_query_,
-				forest.min_rv, non_disjoint_predicate)) {
+	for(feasible_tree &tree : active_trees.disjoint_less(*g_, sieve_query_,
+				k - h - num_forest_neighbors, forest.min_rv,
+				member_predicate, neighbor_predicate)) {
 		auto rv = tree.vertices.front();
 		join_with(tree, rv, forest.max_rv);
 	}
 	// Join both lesser and greater inactive trees into this forest.
-	for(feasible_tree &tree : inactive_trees.disjoint_less(sieve_query_,
-				forest.min_rv, non_disjoint_predicate)) {
+	for(feasible_tree &tree : inactive_trees.disjoint_less(*g_, sieve_query_,
+				k - h - num_forest_neighbors, forest.min_rv,
+				member_predicate, neighbor_predicate)) {
 		auto rv = tree.vertices.front();
 		join_with(tree, rv, forest.max_rv);
 	}
-	for(feasible_tree &tree : inactive_trees.disjoint_greater(sieve_query_,
-				forest.max_rv, non_disjoint_predicate)) {
+	for(feasible_tree &tree : inactive_trees.disjoint_greater(*g_, sieve_query_,
+				k - h - num_forest_neighbors, forest.max_rv,
+				member_predicate, neighbor_predicate)) {
 		auto rv = tree.vertices.front();
 		join_with(tree, forest.min_rv, rv);
 	}
