@@ -81,7 +81,7 @@ int simple_pid_solver::compute_treedepth() {
 				if(decide_treedepth_(k))
 					break;
 			} catch(const std::bad_alloc &) {
-				std::cout << "allocation failure in simple-pid solver\n"
+				std::cerr << "allocation failure in simple-pid solver\n"
 						<< "    eternal memory is at: "
 						<< print_memory(eternal_arena_.used_space()) << "\n"
 						<< "    join memory is at: "

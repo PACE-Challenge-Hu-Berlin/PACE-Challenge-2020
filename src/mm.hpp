@@ -8,7 +8,7 @@
 struct print_memory {
 	friend std::ostream &operator<< (std::ostream &os, const print_memory &self) {
 		if(self.n_ >= 10 * (size_t(1) << 30)) {
-			os << self.n_ << " GiB";
+			os << (self.n_ >> 30) << " GiB";
 		}else if(self.n_ >= 10 * (size_t(1) << 20)) {
 			os << (self.n_ >> 20) << " MiB";
 		}else if(self.n_ > 10 * (size_t(1) << 10)) {
