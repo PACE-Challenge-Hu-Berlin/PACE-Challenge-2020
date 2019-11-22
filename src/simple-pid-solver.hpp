@@ -76,9 +76,9 @@ private:
 
 	// The following data structure store all feasible trees of height <= current h.
 	// Set of trees that are currently being expanded. Those have height == current h.
-	block_sieve<feasible_tree> active_trees;
+	separated_sieve<feasible_tree> active_trees;
 	// Set of trees that were already expanded. Those have height < current h.
-	block_sieve<feasible_tree> inactive_trees;
+	separated_sieve<feasible_tree> inactive_trees;
 
 	// (Incomplete) set of feasible trees of height > current h.
 	std::unordered_map<vertex_span, staged_tree> staged_trees;
@@ -88,7 +88,7 @@ private:
 	std::queue<std::pair<feasible_composition, ownership>> compose_q_;
 
 	// Auxiliary data structures to compute neighbor sets and separators etc.
-	block_sieve_query<feasible_tree> sieve_query_;
+	separated_sieve_query<feasible_tree> sieve_query_;
 	boolean_marker pivot_marker_;
 	boolean_marker pivot_neighbor_marker_;
 	boolean_marker associate_marker_;

@@ -298,6 +298,14 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 				false, false}, ownership::owned});
 		join_memory_.seal();
 	};
+	auto join_with_predecessor = [&] (const feasible_tree &tree) {
+		auto rv = tree.vertices.front();
+		join_with(tree, rv, forest.max_rv);
+	};
+	auto join_with_successor = [&] (const feasible_tree &tree) {
+		auto rv = tree.vertices.front();
+		join_with(tree, forest.min_rv, rv);
+	};
 
 	auto member_predicate = [&] (vertex v) {
 		return pivot_marker_.is_marked(v);
@@ -311,26 +319,17 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	// or - are ordered after all components of this forest
 	// w.r.t. the order induced by representative vertices.
 
-	// Join only lesser active trees into this forest.
-	for(feasible_tree &tree : active_trees.disjoint_less(*g_, sieve_query_,
+	// Join only preceeding active trees into this forest.
+	active_trees.list_predecessors(*g_, sieve_query_,
 				k - h - num_forest_neighbors, forest.min_rv,
-				member_predicate, neighbor_predicate)) {
-		auto rv = tree.vertices.front();
-		join_with(tree, rv, forest.max_rv);
-	}
-	// Join both lesser and greater inactive trees into this forest.
-	for(feasible_tree &tree : inactive_trees.disjoint_less(*g_, sieve_query_,
+				member_predicate, neighbor_predicate, join_with_predecessor);
+	// Join both preceeding and succeeding inactive trees into this forest.
+	inactive_trees.list_predecessors(*g_, sieve_query_,
 				k - h - num_forest_neighbors, forest.min_rv,
-				member_predicate, neighbor_predicate)) {
-		auto rv = tree.vertices.front();
-		join_with(tree, rv, forest.max_rv);
-	}
-	for(feasible_tree &tree : inactive_trees.disjoint_greater(*g_, sieve_query_,
+				member_predicate, neighbor_predicate, join_with_predecessor);
+	inactive_trees.list_successors(*g_, sieve_query_,
 				k - h - num_forest_neighbors, forest.max_rv,
-				member_predicate, neighbor_predicate)) {
-		auto rv = tree.vertices.front();
-		join_with(tree, forest.min_rv, rv);
-	}
+				member_predicate, neighbor_predicate, join_with_successor);
 
 	if(!forest.atomic || forest.trivial) {
 		compose_q_.push({feasible_composition{forest.vertices, forest.separator,
