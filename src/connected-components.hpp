@@ -32,7 +32,16 @@ struct connected_components {
 				cc_lists_.begin() + cc_indices_[i + 1]};
 	}
 
-	void compute(const graph &g) {
+	template<typename G>
+	void compute(const G &g) {
+		// We would like to avoid the allocation here (by storing the stack in the class)
+		// but that is not possible due to the template parameter G.
+		// TODO: add a caching memory allocator that allows us to reuse the allocation.
+		//       Right now, that would not really help since connected_components is not
+		//       on a hot path in the PID code and the naive branching code duplicates the
+		//       connected_components object anyway.
+		std::vector<std::pair<vertex, typename G::neighbor_range::iterator>> stack;
+
 		visited_.reset(g.id_limit());
 		cc_lists_.clear();
 		cc_indices_.clear();
@@ -44,27 +53,27 @@ struct connected_components {
 			// This vertex starts a new CC.
 			cc_indices_.push_back(cc_lists_.size());
 
-			stack_.push_back({r, g.neighbors(r).begin()});
+			stack.push_back({r, g.neighbors(r).begin()});
 			visited_.mark(r);
 			cc_lists_.push_back(r);
 
-			while(!stack_.empty()) {
-				auto v = stack_.back().first;
-				auto &it = stack_.back().second;
+			while(!stack.empty()) {
+				auto v = stack.back().first;
+				auto &it = stack.back().second;
 
 				// Skip neighbors that are already visited.
 				while(it != g.neighbors(v).end() && visited_.is_marked(*it))
 					++it;
 
 				if(it == g.neighbors(v).end()) {
-					stack_.pop_back();
+					stack.pop_back();
 					continue;
 				}
 
 				// Note: the reference to it is invalidated by the push_back!
 				auto w = *it;
 				++it;
-				stack_.push_back({w, g.neighbors(w).begin()});
+				stack.push_back({w, g.neighbors(w).begin()});
 				visited_.mark(w);
 				cc_lists_.push_back(w);
 			}
@@ -79,6 +88,5 @@ private:
 	std::vector<vertex> cc_lists_;
 	std::vector<size_t> cc_indices_;
 
-	std::vector<std::pair<vertex, graph::neighbor_range::iterator>> stack_;
 	boolean_marker visited_;
 };

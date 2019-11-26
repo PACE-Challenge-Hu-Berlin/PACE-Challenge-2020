@@ -51,9 +51,9 @@ void read_pace_graph(std::istream &ifs, graph &g) {
 			// TODO: Make sure that values are parsed correctly.
 			// TODO: Make sure that line ends here (except for whitespace).
 
-			for(int i = 0; i <= n; i++)
-				g.add_vertex();
-			g.eliminate(0); // Do not use vertex ID zero.
+			g.resize_ids(n + 1);
+			for(int i = 1; i <= n; i++)
+				g.add_vertex(i);
 			found_p = true;
 			break;
 		}else{

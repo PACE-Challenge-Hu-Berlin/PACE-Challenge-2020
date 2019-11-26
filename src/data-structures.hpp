@@ -15,11 +15,19 @@ struct boolean_marker {
 		++ts_;
 	}
 
+	size_t size() const {
+		return vec_.size();
+	}
+
 	void mark(size_t x) {
 		vec_[x] = ts_;
 	}
 
-	bool is_marked(size_t x) {
+	void unmark(size_t x) {
+		vec_[x] = 0;
+	}
+
+	bool is_marked(size_t x) const {
 		return vec_[x] == ts_;
 	}
 

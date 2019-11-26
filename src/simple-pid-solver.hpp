@@ -73,6 +73,7 @@ private:
 	void compose_(int k, int h, feasible_composition &comp);
 
 	graph *g_;
+	graph sg_;
 	memory_arena eternal_arena_;
 	queue_memory join_memory_;
 	queue_memory compose_memory_;

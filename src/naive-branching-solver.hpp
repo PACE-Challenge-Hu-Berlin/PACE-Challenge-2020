@@ -21,5 +21,6 @@ private:
 	std::pair<bool, int> recurse_(int k);
 
 	graph *g_;
+	boolean_marker current_;
 	statistics stats_;
 };

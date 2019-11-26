@@ -64,16 +64,17 @@ int simple_pid_solver::compute_treedepth() {
 	connected_components cc;
 	cc.compute(*g_);
 
-	// Eliminate all but the first component.
-	for(size_t j = 1; j < cc.num_components(); j++)
-		for(vertex v : cc.component(j))
-			g_->eliminate(v);
+	boolean_marker mask;
 
 	int td = 0;
+	for(size_t i = 0; i < cc.num_components(); ++i) {
+		mask.reset(g_->id_limit());
+		for(vertex v : cc.component(i))
+			mask.mark(v);
 
-	// Invariant: Only the i-th component is uneliminated.
-	size_t i;
-	for(i = 0; /* exit through break below */ ; i++) {
+		induced_subgraph isg{*g_, mask};
+		isg.materialize(sg_);
+
 		int k = 0;
 		std::cerr << "solving CC " << (i + 1) << " of " << cc.num_components() << std::endl;
 		while(true) {
@@ -93,22 +94,6 @@ int simple_pid_solver::compute_treedepth() {
 			k++;
 		}
 		td = std::max(td, k);
-
-		// Eliminate the i-th component, uneliminate the (i+1)-th.
-		if(i + 1 >= cc.num_components())
-			break;
-		for(vertex v : cc.component(i))
-			g_->eliminate(v);
-		for(vertex v : cc.component(i + 1))
-			g_->uneliminate(v);
-	}
-
-	// Uneliminate all but the i-th component.
-	for(size_t j = 0; j < cc.num_components(); j++) {
-		if(j == i)
-			continue;
-		for(vertex v : cc.component(j))
-			g_->uneliminate(v);
 	}
 
 	return td;
@@ -124,8 +109,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	staged_trees.clear();
 	eternal_arena_.reset();
 
-	for(vertex v : g_->vertices()) {
-		if(g_->degree(v) + 1 > k)
+	for(vertex v : sg_.vertices()) {
+		if(sg_.degree(v) + 1 > k)
 			continue;
 		workset_.clear();
 		workset_.push_back(v);
@@ -146,13 +131,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				continue;
 
 			// Find the neighbor set of the tree to turn it into an atomic forest.
-			pivot_marker_.reset(g_->id_limit());
-			pivot_neighbor_marker_.reset(g_->id_limit());
+			pivot_marker_.reset(sg_.id_limit());
+			pivot_neighbor_marker_.reset(sg_.id_limit());
 			separator_.clear();
 			for(vertex v : staged.vertices)
 				pivot_marker_.mark(v);
 			for(vertex v : staged.vertices)
-				for(vertex w : g_->neighbors(v)) {
+				for(vertex w : sg_.neighbors(v)) {
 					if(pivot_marker_.is_marked(w))
 						continue;
 					if(pivot_neighbor_marker_.is_marked(w))
@@ -166,7 +151,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
-			active_trees.insert(*g_, staged.vertices, feasible_tree{staged.vertices, staged.h});
+			active_trees.insert(sg_, staged.vertices, feasible_tree{staged.vertices, staged.h});
 		}
 
 		if(all_trees_inactive)
@@ -223,13 +208,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				<< ", compose: " << print_time{stats_.time_compose} << std::endl;
 
 		for(const feasible_tree &tree : active_trees)
-			inactive_trees.insert(*g_, tree.vertices, tree);
+			inactive_trees.insert(sg_, tree.vertices, tree);
 		active_trees.clear();
 	}
 
 	for(const auto &entry : staged_trees) {
 		const auto &staged = entry.second;
-		if(staged.vertices.size() == g_->num_vertices())
+		if(staged.vertices.size() == sg_.num_vertices())
 			return true;
 	}
 	return false;
@@ -239,13 +224,13 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	profiling_timer join_timer;
 
 	// Mark and count the neighbors of the feasible forest.
-	pivot_marker_.reset(g_->id_limit());
-	pivot_neighbor_marker_.reset(g_->id_limit());
+	pivot_marker_.reset(sg_.id_limit());
+	pivot_neighbor_marker_.reset(sg_.id_limit());
 	unsigned int num_forest_neighbors = 0;
 	for(vertex v : forest.vertices)
 		pivot_marker_.mark(v);
 	for(vertex v : forest.vertices) {
-		for(vertex w : g_->neighbors(v)) {
+		for(vertex w : sg_.neighbors(v)) {
 			if(pivot_marker_.is_marked(w))
 				continue;
 			if(pivot_neighbor_marker_.is_marked(w))
@@ -259,15 +244,15 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		int num_total_neighbors = num_forest_neighbors;
 
 		// Determine the neighbors of the tree that we are trying to join.
-		associate_marker_.reset(g_->id_limit());
-		associate_neighbor_marker_.reset(g_->id_limit());
+		associate_marker_.reset(sg_.id_limit());
+		associate_neighbor_marker_.reset(sg_.id_limit());
 		for(vertex v : tree.vertices) {
 			assert(!pivot_marker_.is_marked(v));
 			associate_marker_.mark(v);
 		}
 
 		for(vertex v : tree.vertices) {
-			for(vertex w : g_->neighbors(v)) {
+			for(vertex w : sg_.neighbors(v)) {
 				assert(!pivot_marker_.is_marked(w));
 				if(associate_marker_.is_marked(w))
 					continue;
@@ -329,14 +314,14 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	// w.r.t. the order induced by representative vertices.
 
 	// Join only preceeding active trees into this forest.
-	active_trees.list_predecessors(*g_, sieve_query_,
+	active_trees.list_predecessors(sg_, sieve_query_,
 				k - h - num_forest_neighbors, forest.min_rv,
 				member_predicate, neighbor_predicate, join_with_predecessor);
 	// Join both preceeding and succeeding inactive trees into this forest.
-	inactive_trees.list_predecessors(*g_, sieve_query_,
+	inactive_trees.list_predecessors(sg_, sieve_query_,
 				k - h - num_forest_neighbors, forest.min_rv,
 				member_predicate, neighbor_predicate, join_with_predecessor);
-	inactive_trees.list_successors(*g_, sieve_query_,
+	inactive_trees.list_successors(sg_, sieve_query_,
 				k - h - num_forest_neighbors, forest.max_rv,
 				member_predicate, neighbor_predicate, join_with_successor);
 	stats_.time_join += join_timer.elapsed();
@@ -351,13 +336,13 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 	profiling_timer compose_timer;
 
-	pivot_marker_.reset(g_->id_limit());
-	pivot_neighbor_marker_.reset(g_->id_limit());
+	pivot_marker_.reset(sg_.id_limit());
+	pivot_neighbor_marker_.reset(sg_.id_limit());
 	int num_forest_neighbors = 0;
 	for(vertex v : comp.vertices)
 		pivot_marker_.mark(v);
 	for(vertex v : comp.vertices) {
-		for(vertex w : g_->neighbors(v)) {
+		for(vertex w : sg_.neighbors(v)) {
 			if(pivot_marker_.is_marked(w))
 				continue;
 			if(pivot_neighbor_marker_.is_marked(w))
@@ -371,7 +356,7 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		// Count number of neighbors of the composition.
 		// Since u is a neighbor of the vertex set, subtract one to begin with.
 		int num_composed_neighbors = num_forest_neighbors - 1;
-		for(vertex w : g_->neighbors(u)) {
+		for(vertex w : sg_.neighbors(u)) {
 			if(pivot_marker_.is_marked(w) || pivot_neighbor_marker_.is_marked(w))
 				continue;
 			++num_composed_neighbors;
