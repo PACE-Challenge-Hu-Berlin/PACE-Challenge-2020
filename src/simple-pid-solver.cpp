@@ -218,6 +218,9 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "    join memory: " << print_memory{join_memory_.max_used_space()}
 				<< ", compose memory: " << print_memory{compose_memory_.max_used_space()}
 				<< std::endl;
+		std::cerr << "    join time: " << print_time{stats_.time_join}
+				<< ", assembling: " << print_time{stats_.time_join_assemble}
+				<< ", compose: " << print_time{stats_.time_compose} << std::endl;
 
 		for(const feasible_tree &tree : active_trees)
 			inactive_trees.insert(*g_, tree.vertices, tree);
@@ -233,6 +236,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 }
 
 void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
+	profiling_timer join_timer;
+
 	// Mark and count the neighbors of the feasible forest.
 	pivot_marker_.reset(g_->id_limit());
 	pivot_neighbor_marker_.reset(g_->id_limit());
@@ -299,12 +304,16 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		join_memory_.seal();
 	};
 	auto join_with_predecessor = [&] (const feasible_tree &tree) {
+		profiling_timer assemble_timer;
 		auto rv = tree.vertices.front();
 		join_with(tree, rv, forest.max_rv);
+		stats_.time_join_assemble += assemble_timer.elapsed();
 	};
 	auto join_with_successor = [&] (const feasible_tree &tree) {
+		profiling_timer assemble_timer;
 		auto rv = tree.vertices.front();
 		join_with(tree, forest.min_rv, rv);
+		stats_.time_join_assemble += assemble_timer.elapsed();
 	};
 
 	auto member_predicate = [&] (vertex v) {
@@ -330,6 +339,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	inactive_trees.list_successors(*g_, sieve_query_,
 				k - h - num_forest_neighbors, forest.max_rv,
 				member_predicate, neighbor_predicate, join_with_successor);
+	stats_.time_join += join_timer.elapsed();
 
 	if(!forest.atomic || forest.trivial) {
 		compose_q_.push({feasible_composition{forest.vertices, forest.separator,
@@ -339,6 +349,8 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 }
 
 void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
+	profiling_timer compose_timer;
+
 	pivot_marker_.reset(g_->id_limit());
 	pivot_neighbor_marker_.reset(g_->id_limit());
 	int num_forest_neighbors = 0;
@@ -409,4 +421,5 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 				comp.h + 1, comp.trivial}, ownership::owned});
 		compose_memory_.seal();
 	}
+	stats_.time_compose += compose_timer.elapsed();
 }

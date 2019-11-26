@@ -4,6 +4,7 @@
 #include "io.hpp"
 #include "naive-branching-solver.hpp"
 #include "simple-pid-solver.hpp"
+#include "utilities.hpp"
 
 static const char *usage_text =
 	"Usage: td [OPTIONS] INSTANCE\n"
@@ -31,6 +32,14 @@ void parse_options(char **p, options &opts) {
 	// Argument for unary options.
 	const char *arg;
 
+	auto handle_nullary_option = [&] (const char *name) -> bool {
+		assert(*p);
+		if(std::strcmp(*p, name))
+			return false;
+		++p;
+		return true;
+	};
+
 	auto handle_unary_option = [&] (const char *name) -> bool {
 		assert(*p);
 		if(std::strcmp(*p, name))
@@ -45,7 +54,9 @@ void parse_options(char **p, options &opts) {
 
 	// TODO: Here, we can parse command line arguments.
 	while(*p && !std::strncmp(*p, "--", 2)) {
-		if(handle_unary_option("--solver")) {
+		if(handle_nullary_option("--profile")) {
+			global_profiling_flag = true;
+		}else if(handle_unary_option("--solver")) {
 			if(!std::strcmp(arg, "naive-branching")) {
 				opts.solver = solver_algorithm::naive_branching;
 			}else if(!std::strcmp(arg, "simple-pid")) {
@@ -79,13 +90,19 @@ int main(int argc, char *argv[]) {
 	std::cerr << "graph has " << g.num_vertices() << " vertices" << std::endl;
 
 	int solution;
+	profiling_duration solve_duration;
 	if(opts.solver == solver_algorithm::naive_branching) {
 		naive_branching_solver solver{g};
+		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
+		solve_duration = solve_timer.elapsed();
 	}else{
 		assert(opts.solver == solver_algorithm::simple_pid);
 		simple_pid_solver solver{g};
+		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
+		solve_duration = solve_timer.elapsed();
 	}
 	std::cout << "s " << solution << std::endl;
+	std::cerr << "time: " << print_time(solve_duration) << std::endl;
 }

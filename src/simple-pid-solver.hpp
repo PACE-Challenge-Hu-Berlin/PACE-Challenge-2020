@@ -7,12 +7,16 @@
 #include "data-structures.hpp"
 #include "graph.hpp"
 #include "mm.hpp"
+#include "utilities.hpp"
 
 struct simple_pid_solver {
 	struct statistics {
 		int64_t num_empty_separator = 0;
 		int64_t num_pruned_forests = 0;
 		int64_t num_pruned_compositions = 0;
+		profiling_duration time_join{};
+		profiling_duration time_join_assemble{};
+		profiling_duration time_compose{};
 	};
 
 	struct feasible_tree {
