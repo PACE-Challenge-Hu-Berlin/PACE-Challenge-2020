@@ -197,6 +197,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "    empty separator: " << stats_.num_empty_separator << std::endl;
 		std::cerr << "    pruned forests: " << stats_.num_pruned_forests
 				<< ", compositions: " << stats_.num_pruned_compositions << std::endl;
+		std::cerr << "    protected separators: " << stats_.num_protected_separators
+				<< std::endl;
 		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
 				<< ", allocations: " << eternal_arena_.num_allocations()
 				<< std::endl;
@@ -240,6 +242,18 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 	}
 
+	protected_marker_.reset(sg_.id_limit());
+	for(vertex v : forest.separator) {
+		bool protect = true;
+		for(vertex w : sg_.neighbors(v))
+			if(!pivot_marker_.is_marked(w) && !pivot_neighbor_marker_.is_marked(w)) {
+				protect = false;
+				break;
+			}
+		if(protect)
+			protected_marker_.mark(v);
+	}
+
 	auto join_with = [&] (const feasible_tree &tree, vertex min_rv, vertex max_rv) {
 		int num_total_neighbors = num_forest_neighbors;
 
@@ -271,8 +285,12 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 
 		separator_.clear();
 		for(vertex v : forest.separator)
-			if(associate_neighbor_marker_.is_marked(v))
+			if(associate_neighbor_marker_.is_marked(v)) {
 				separator_.push_back(v);
+			}else if(protected_marker_.is_marked(v)) {
+				++stats_.num_protected_separators;
+				return;
+			}
 
 		if(!separator_.size()) {
 			++stats_.num_empty_separator;

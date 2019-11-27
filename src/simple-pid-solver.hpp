@@ -14,6 +14,7 @@ struct simple_pid_solver {
 		int64_t num_empty_separator = 0;
 		int64_t num_pruned_forests = 0;
 		int64_t num_pruned_compositions = 0;
+		int64_t num_protected_separators = 0;
 		profiling_duration time_join{};
 		profiling_duration time_join_assemble{};
 		profiling_duration time_compose{};
@@ -96,6 +97,7 @@ private:
 	separated_sieve_query<feasible_tree> sieve_query_;
 	boolean_marker pivot_marker_;
 	boolean_marker pivot_neighbor_marker_;
+	boolean_marker protected_marker_;
 	boolean_marker associate_marker_;
 	boolean_marker associate_neighbor_marker_;
 	std::vector<vertex> workset_;
