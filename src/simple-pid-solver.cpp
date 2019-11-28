@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "connected-components.hpp"
+#include "kernelization.hpp"
 #include "precedence-by-inclusion.hpp"
 #include "simple-pid-solver.hpp"
 #include "subgraph.hpp"
@@ -65,22 +66,16 @@ simple_pid_solver::simple_pid_solver(graph &g, bool no_precedence)
 : g_{&g}, no_precedence{no_precedence}{ }
 
 int simple_pid_solver::compute_treedepth() {
-	connected_components cc;
-	cc.compute(*g_);
-
-	boolean_marker mask;
+	kernelization kern;
+	kern.compute(*g_);
 
 	int td = 0;
-	for(size_t i = 0; i < cc.num_components(); ++i) {
-		mask.reset(g_->id_limit());
-		for(vertex v : cc.component(i))
-			mask.mark(v);
-
-		induced_subgraph isg{*g_, mask};
-		isg.materialize(sg_);
+	for(size_t i = 0; i < kern.num_components(); ++i) {
+		sg_ = kern.component(i);
 
 		int k = 0;
-		std::cerr << "solving CC " << (i + 1) << " of " << cc.num_components() << std::endl;
+		std::cerr << "solving component " << (i + 1)
+				<< " of " << kern.num_components() << std::endl;
 		while(true) {
 			try {
 				if(decide_treedepth_(k))

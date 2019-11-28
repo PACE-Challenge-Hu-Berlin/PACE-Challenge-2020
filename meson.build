@@ -1,6 +1,7 @@
 project('treedepth', 'cpp')
 
 executable('td',
+		'src/kernelization.cpp',
 		'src/main.cpp',
 		'src/mm.cpp',
 		'src/naive-branching-solver.cpp',

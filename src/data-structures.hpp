@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 using vertex = unsigned int;
