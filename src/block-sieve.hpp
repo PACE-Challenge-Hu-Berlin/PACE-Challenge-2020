@@ -112,15 +112,13 @@ public:
 	void insert(const graph &g, vertex_span vs, E element) {
 		assert(vs.size());
 
-		auto nd = new trie{vs, element};
-		unsigned int nlen = nd->vs.size();
-
 		auto r = log_ceil2int(vs.size());
 		if(r >= roots_.size())
 			roots_.resize(r + 1, nullptr);
 
 		if(!roots_[r]) {
-			nd->plen = nlen;
+			auto nd = new trie{vs, element};
+			nd->plen = vs.size();
 			recompute_neighbors_(g, nd, 0);
 			roots_[r] = nd;
 			++size_;
@@ -131,87 +129,98 @@ public:
 		auto cur = roots_[r];
 		trie *previous = nullptr;
 		while(true) {
-			// Order sets by their representative (this is only important in the first level).
-			if(!pfx && vs[0] < cur->vs[0]) {
-				trie *parent = cur->parent;
-				nd->plen = nlen;
-				nd->parent = parent;
-				nd->next = cur;
-				recompute_neighbors_(g, nd, pfx);
+			assert(pfx < vs.size());
+			assert(pfx < cur->plen);
 
-				if(previous) {
-					assert(previous->next == cur);
-					previous->next = nd;
-				}else if(parent) {
-					assert(parent->child == cur);
-					parent->child = nd;
-				}else{
-					assert(roots_[r] == cur);
-					roots_[r] = nd;
-				}
-				++size_;
-				return;
-			}
-
-			unsigned int i;
-			for(i = pfx; i < std::min(cur->plen, nlen); i++)
-				if(cur->vs[i] != vs[i])
-					break;
-
-			if(i == pfx) {
+			if(vs[pfx] != cur->vs[pfx]) {
 				// No match. Proceed sideways.
-				if(!cur->next) {
-					nd->plen = nlen;
-					nd->parent = cur->parent;
+				if(vs[pfx] < cur->vs[pfx]) {
+					auto nd = new trie{vs, element};
+					trie *parent = cur->parent;
+					nd->plen = vs.size();
+					nd->parent = parent;
+					nd->next = cur;
 					recompute_neighbors_(g, nd, pfx);
-					cur->next = nd;
+
+					if(previous) {
+						assert(previous->next == cur);
+						previous->next = nd;
+					}else if(parent) {
+						assert(parent->child == cur);
+						parent->child = nd;
+					}else{
+						assert(roots_[r] == cur);
+						roots_[r] = nd;
+					}
 					++size_;
 					return;
-				}
-
-				previous = cur;
-				cur = cur->next;
-			}else if(i == cur->plen) {
-				// Full match. Proceed downwards.
-				if(!cur->child) {
-					nd->plen = nlen;
-					nd->parent = cur;
-					recompute_neighbors_(g, nd, cur->plen);
-					cur->child = nd;
-					++size_;
-					return;
-				}
-
-				previous = nullptr;
-				pfx = cur->plen;
-				cur = cur->child;
-			}else{
-				assert(i < cur->plen);
-
-				// Partial match. Exchange the current node.
-				assert(vs[0] == cur->vs[0]);
-				trie *parent = cur->parent;
-				nd->plen = i;
-				nd->parent = parent;
-				nd->child = cur;
-				nd->next = cur->next;
-				recompute_neighbors_(g, nd, pfx);
-				cur->parent = nd;
-				cur->next = nullptr;
-				recompute_neighbors_(g, cur, i);
-
-				if(previous) {
-					assert(previous->next == cur);
-					previous->next = nd;
-				}else if(parent) {
-					assert(parent->child == cur);
-					parent->child = nd;
 				}else{
-					assert(roots_[r] == cur);
-					roots_[r] = nd;
+					if(!cur->next) {
+						auto nd = new trie{vs, element};
+						nd->plen = vs.size();
+						nd->parent = cur->parent;
+						recompute_neighbors_(g, nd, pfx);
+						cur->next = nd;
+						++size_;
+						return;
+					}
+
+					previous = cur;
+					cur = cur->next;
 				}
-				++size_;
-				return;
+			}else{
+				unsigned int i;
+				auto clen = std::min(cur->plen, static_cast<unsigned int>(vs.size()));
+				for(i = pfx; i < clen; i++)
+					if(cur->vs[i] != vs[i])
+						break;
+
+				// Full or partial match. Proceed downwards.
+				if(i < cur->plen) {
+					auto nd = new trie{vs, element};
+					trie *parent = cur->parent;
+					nd->plen = i;
+					nd->parent = parent;
+					nd->child = cur;
+					nd->next = cur->next;
+					recompute_neighbors_(g, nd, pfx);
+					cur->parent = nd;
+					cur->next = nullptr;
+					recompute_neighbors_(g, cur, i);
+
+					if(previous) {
+						assert(previous->next == cur);
+						previous->next = nd;
+					}else if(parent) {
+						assert(parent->child == cur);
+						parent->child = nd;
+					}else{
+						assert(roots_[r] == cur);
+						roots_[r] = nd;
+					}
+					++size_;
+					return;
+				}else if(i == cur->plen && i == vs.size()) {
+					// We want to move downwards but the block is too small.
+					// Exchange it with the already present block.
+					assert(vs != cur->vs);
+					std::swap(vs, cur->vs);
+					std::swap(element, cur->element);
+				}else{
+					if(!cur->child) {
+						auto nd = new trie{vs, element};
+						nd->plen = vs.size();
+						nd->parent = cur;
+						recompute_neighbors_(g, nd, cur->plen);
+						cur->child = nd;
+						++size_;
+						return;
+					}
+
+					previous = nullptr;
+					pfx = cur->plen;
+					cur = cur->child;
+				}
 			}
 		}
 	}
