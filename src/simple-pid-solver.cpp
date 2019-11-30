@@ -2,8 +2,9 @@
 #include <iostream>
 
 #include "connected-components.hpp"
-#include "simple-pid-solver.hpp"
 #include "precedence-by-inclusion.hpp"
+#include "simple-pid-solver.hpp"
+#include "subgraph.hpp"
 
 namespace {
 	constexpr bool debug_trees = false;

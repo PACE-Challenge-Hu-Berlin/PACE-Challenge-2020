@@ -4,6 +4,7 @@
 
 #include "connected-components.hpp"
 #include "naive-branching-solver.hpp"
+#include "subgraph.hpp"
 
 // Note: this algorithm is intended to be a simple baseline
 //       (e.g., to verify that other algorithms yield correct results).
