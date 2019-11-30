@@ -8,7 +8,7 @@ struct print_time {
 	friend std::ostream &operator<< (std::ostream &os, const print_time &self) {
 		std::ios ios{nullptr};
 		ios.copyfmt(os);
-		os << std::setprecision(4) << self.dur_.count() << " s";
+		os << std::fixed << std::setprecision(3) << self.dur_.count() << " s";
 		os.copyfmt(ios);
 		return os;
 	}
