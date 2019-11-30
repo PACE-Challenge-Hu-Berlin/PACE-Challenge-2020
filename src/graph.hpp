@@ -114,6 +114,28 @@ struct graph {
 		vertex v_;
 	};
 
+	friend void swap(graph &g1, graph &g2) {
+		using std::swap;
+		swap(g1.id_limit_, g2.id_limit_);
+		swap(g1.num_vertices_, g2.num_vertices_);
+		swap(g1.exists_, g2.exists_);
+		swap(g1.adj_lists_, g2.adj_lists_);
+	}
+
+	graph() = default;
+
+	graph(const graph &other) = default;
+
+	graph(graph &&other)
+	: graph{} {
+		swap(*this, other);
+	}
+
+	graph &operator= (graph other) {
+		swap(*this, other);
+		return *this;
+	}
+
 	void resize_ids(unsigned int n) {
 		// TODO: support shrinking, but only if there are no vertices.
 		assert(id_limit_ <= n);
