@@ -23,7 +23,7 @@ struct simple_pid_solver {
 	};
 
 	struct feasible_tree {
-		vertex_span vertices;
+		vertex_key vertices;
 		int h;
 	};
 
@@ -49,7 +49,7 @@ struct simple_pid_solver {
 	};
 
 	struct staged_tree {
-		vertex_span vertices;
+		vertex_key vertices;
 		int h;
 		// Vertices can only be arranged in a path.
 		bool trivial;
@@ -92,7 +92,7 @@ private:
 	separated_sieve<feasible_tree> inactive_trees;
 
 	// (Incomplete) set of feasible trees of height > current h.
-	std::unordered_map<vertex_span, staged_tree> staged_trees;
+	std::unordered_map<vertex_key, staged_tree> staged_trees;
 
 	// Queues to process newly found feasible forests and feasible compositions.
 	std::queue<std::pair<feasible_forest, ownership>> join_q_;

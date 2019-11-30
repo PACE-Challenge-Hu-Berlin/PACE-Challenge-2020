@@ -12,7 +12,7 @@ private:
 	// TODO: improve cache efficiency by storing all siblings in a contiguous buffer.
 	// TODO: store the first vertex of the prefix inside this struct to improve locality.
 	struct trie {
-		vertex_span vs;
+		vertex_key vs;
 		E element;
 		trie *parent = nullptr;
 		trie *next = nullptr;
@@ -125,7 +125,7 @@ public:
 		return size_;
 	}
 
-	void insert(const graph &g, vertex_span vs, E element) {
+	void insert(const graph &g, vertex_key vs, E element) {
 		assert(vs.size());
 
 		auto r = log_ceil2int(vs.size());
@@ -274,7 +274,7 @@ public:
 		return sieve_sentinel{};
 	}
 
-	sieve_iterator find(vertex_span vs) {
+	sieve_iterator find(vertex_key vs) {
 		assert(vs.size());
 
 		auto r = log_ceil2int(vs.size());

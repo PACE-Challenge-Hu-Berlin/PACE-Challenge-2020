@@ -226,9 +226,9 @@ private:
 	std::vector<std::vector<vertex>> adj_lists_;
 };
 
-// Lightweight reference to a set of vertices.
-struct vertex_span {
-	friend bool operator== (vertex_span vs1, vertex_span vs2) {
+// Lightweight reference to a sorted set of vertices.
+struct vertex_key {
+	friend bool operator== (vertex_key vs1, vertex_key vs2) {
 		if(vs1.size() != vs2.size())
 			return false;
 		for(size_t i = 0; i < vs1.size(); i++)
@@ -237,21 +237,21 @@ struct vertex_span {
 		return true;
 	}
 
-	friend bool operator!= (vertex_span vs1, vertex_span vs2) {
+	friend bool operator!= (vertex_key vs1, vertex_key vs2) {
 		return !(vs1 == vs2);
 	}
 
-	vertex_span()
+	vertex_key()
 	: begin_{nullptr}, end_{nullptr} { }
 
-	vertex_span(const vertex *begin, const vertex *end)
+	vertex_key(const vertex *begin, const vertex *end)
 	: begin_{begin}, end_{end} { }
 
-	vertex_span(span<vertex> s)
+	vertex_key(span<vertex> s)
 	: begin_{s.begin()}, end_{s.end()} { }
 
 	template<typename A>
-	explicit vertex_span(const std::vector<vertex, A> &vec)
+	explicit vertex_key(const std::vector<vertex, A> &vec)
 	: begin_{vec.data()}, end_{vec.data() + vec.size()} { }
 
 	span<vertex> as_span() const {
@@ -294,10 +294,10 @@ private:
 
 namespace std {
 	template<>
-	struct hash<vertex_span> {
+	struct hash<vertex_key> {
 		// Possibly the worst hash function ever imagined.
 		// TODO: Pick a reasonable hash function.
-		size_t operator() (vertex_span vs) const {
+		size_t operator() (vertex_key vs) const {
 			size_t hash = 0x12345678;
 			for(auto p = vs.begin(); p != vs.end(); ++p)
 				hash = 13 * hash + *p;

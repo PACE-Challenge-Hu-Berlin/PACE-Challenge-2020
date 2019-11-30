@@ -470,7 +470,7 @@ void simple_pid_solver::compose_(int k, feasible_composition &comp) {
 			return !comp.trivial && staged.trivial;
 		};
 
-		auto it = staged_trees.find(vertex_span{workset_});
+		auto it = staged_trees.find(vertex_key{workset_});
 		if(it == staged_trees.end()) {
 			++num_stage_;
 			staged_tree staged{copy_to_arena(workset_, eternal_arena_),
