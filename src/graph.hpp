@@ -383,6 +383,13 @@ struct vertex_span {
 		return true;
 	}
 
+	friend bool operator!= (vertex_span vs1, vertex_span vs2) {
+		return !(vs1 == vs2);
+	}
+
+	vertex_span()
+	: begin_{nullptr}, end_{nullptr} { }
+
 	vertex_span(const vertex *begin, const vertex *end)
 	: begin_{begin}, end_{end} { }
 
@@ -409,6 +416,10 @@ struct vertex_span {
 
 	const vertex *data() const {
 		return begin_;
+	}
+
+	bool empty() const {
+		return !size();
 	}
 
 	size_t size() const {
