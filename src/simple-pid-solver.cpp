@@ -34,30 +34,30 @@ namespace {
 
 	template<typename C>
 	span<typename C::value_type> copy_to_arena(const C &vec, memory_arena &memory) {
-		arena_allocator<vertex> alloc{memory};
+		arena_allocator<typename C::value_type> alloc{memory};
 		auto p = alloc.allocate(vec.size());
-		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
+		memcpy(p, vec.data(), sizeof(typename C::value_type) * vec.size());
 		return span<typename C::value_type>{p, p + vec.size()};
 	}
 
 	template<typename C>
 	span<typename C::value_type> copy_to_queue(const C &vec, queue_memory &memory) {
-		queue_allocator<vertex> alloc{memory};
+		queue_allocator<typename C::value_type> alloc{memory};
 		auto p = alloc.allocate(vec.size());
-		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
+		memcpy(p, vec.data(), sizeof(typename C::value_type) * vec.size());
 		return span<typename C::value_type>{p, p + vec.size()};
 	}
 
 	template<typename T>
 	void free_in_arena(span<T> vs, memory_arena &memory) {
-		arena_allocator<vertex> alloc{memory};
-		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
+		arena_allocator<T> alloc{memory};
+		alloc.deallocate(const_cast<T *>(vs.data()), vs.size());
 	}
 
 	template<typename T>
 	void free_in_queue(span<T> vs, queue_memory &memory) {
-		queue_allocator<vertex> alloc{memory};
-		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
+		queue_allocator<T> alloc{memory};
+		alloc.deallocate(const_cast<T *>(vs.data()), vs.size());
 	}
 }
 
