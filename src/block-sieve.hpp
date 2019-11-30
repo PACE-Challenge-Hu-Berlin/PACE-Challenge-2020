@@ -111,6 +111,16 @@ private:
 	};
 
 public:
+	separated_sieve() = default;
+
+	separated_sieve(const separated_sieve &) = delete;
+
+	~separated_sieve() {
+		clear();
+	}
+
+	separated_sieve &operator= (const separated_sieve &) = delete;
+
 	size_t size() {
 		return size_;
 	}
