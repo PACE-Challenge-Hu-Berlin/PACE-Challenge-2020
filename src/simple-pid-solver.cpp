@@ -33,27 +33,29 @@ namespace {
 	};
 
 	template<typename C>
-	vertex_span copy_to_arena(const C &vec, memory_arena &memory) {
+	span<typename C::value_type> copy_to_arena(const C &vec, memory_arena &memory) {
 		arena_allocator<vertex> alloc{memory};
 		auto p = alloc.allocate(vec.size());
 		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
-		return vertex_span{p, p + vec.size()};
+		return span<typename C::value_type>{p, p + vec.size()};
 	}
 
 	template<typename C>
-	vertex_span copy_to_queue(const C &vec, queue_memory &memory) {
+	span<typename C::value_type> copy_to_queue(const C &vec, queue_memory &memory) {
 		queue_allocator<vertex> alloc{memory};
 		auto p = alloc.allocate(vec.size());
 		memcpy(p, vec.data(), sizeof(vertex) * vec.size());
-		return vertex_span{p, p + vec.size()};
+		return span<typename C::value_type>{p, p + vec.size()};
 	}
 
-	void free_in_arena(vertex_span vs, memory_arena &memory) {
+	template<typename T>
+	void free_in_arena(span<T> vs, memory_arena &memory) {
 		arena_allocator<vertex> alloc{memory};
 		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
 	}
 
-	void free_in_queue(vertex_span vs, queue_memory &memory) {
+	template<typename T>
+	void free_in_queue(span<T> vs, queue_memory &memory) {
 		queue_allocator<vertex> alloc{memory};
 		alloc.deallocate(const_cast<vertex *>(vs.data()), vs.size());
 	}
@@ -106,7 +108,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	inactive_trees.clear();
 	for(const auto &entry : staged_trees) {
 		const auto &staged = entry.second;
-		free_in_arena(staged.vertices, eternal_arena_);
+		free_in_arena(staged.vertices.as_span(), eternal_arena_);
 	}
 	staged_trees.clear();
 	eternal_arena_.reset();
@@ -198,7 +200,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				}
 
 			auto rv = staged.vertices.front();
-			join_q_.push({feasible_forest{rv, rv, staged.vertices,
+			join_q_.push({feasible_forest{rv, rv, staged.vertices.as_span(),
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
@@ -484,7 +486,7 @@ void simple_pid_solver::compose_(int k, feasible_composition &comp) {
 			++num_unimproved_;
 		}
 
-		compose_q_.push({feasible_composition{it->second.vertices,
+		compose_q_.push({feasible_composition{it->second.vertices.as_span(),
 				copy_to_queue(separator_, compose_memory_),
 				comp.h + 1, comp.trivial}, ownership::owned});
 		compose_memory_.seal();

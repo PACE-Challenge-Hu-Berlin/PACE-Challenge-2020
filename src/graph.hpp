@@ -247,9 +247,16 @@ struct vertex_span {
 	vertex_span(const vertex *begin, const vertex *end)
 	: begin_{begin}, end_{end} { }
 
+	vertex_span(span<vertex> s)
+	: begin_{s.begin()}, end_{s.end()} { }
+
 	template<typename A>
-	vertex_span(const std::vector<vertex, A> &vec)
+	explicit vertex_span(const std::vector<vertex, A> &vec)
 	: begin_{vec.data()}, end_{vec.data() + vec.size()} { }
+
+	span<vertex> as_span() const {
+		return span<vertex>{begin_, end_};
+	}
 
 	vertex operator[] (size_t i) const {
 		return begin_[i];

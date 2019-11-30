@@ -33,8 +33,8 @@ struct simple_pid_solver {
 		// on the component.
 		vertex min_rv; // Minimal representative of all components.
 		vertex max_rv; // Maximal representative of all components.
-		vertex_span vertices;
-		vertex_span separator;
+		span<vertex> vertices;
+		span<vertex> separator;
 		// Forest only consists of a single tree.
 		bool atomic;
 		// Forest is atomic and the only tree is a path.
@@ -42,8 +42,8 @@ struct simple_pid_solver {
 	};
 
 	struct feasible_composition {
-		vertex_span vertices;
-		vertex_span prefix;
+		span<vertex> vertices;
+		span<vertex> prefix;
 		int h;
 		bool trivial;
 	};

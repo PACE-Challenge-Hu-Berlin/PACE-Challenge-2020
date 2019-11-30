@@ -5,6 +5,53 @@
 
 using vertex = unsigned int;
 
+// Lightweight reference to a contiguous array.
+template<typename T>
+struct span {
+	span()
+	: begin_{nullptr}, end_{nullptr} { }
+
+	span(const T *begin, const T *end)
+	: begin_{begin}, end_{end} { }
+
+	template<typename A>
+	explicit span(const std::vector<T, A> &vec)
+	: begin_{vec.data()}, end_{vec.data() + vec.size()} { }
+
+	T operator[] (size_t i) const {
+		return begin_[i];
+	}
+
+	const T *begin() const {
+		return begin_;
+	}
+
+	const T *end() const {
+		return end_;
+	}
+
+	T front() const {
+		assert(begin_ != end_);
+		return *begin_;
+	}
+
+	const T *data() const {
+		return begin_;
+	}
+
+	bool empty() const {
+		return !size();
+	}
+
+	size_t size() const {
+		return end_ - begin_;
+	}
+
+private:
+	const T *begin_;
+	const T *end_;
+};
+
 // Data structure to mark integers (e.g., vertices of a graph).
 // Use a timestamping technique to accelerate resets.
 struct boolean_marker {
