@@ -40,10 +40,16 @@ private:
 	struct sieve_sentinel { };
 
 	struct sieve_iterator {
+		sieve_iterator()
+		: sieve_{nullptr} { }
+
 		explicit sieve_iterator(separated_sieve *sieve)
 		: sieve_{sieve} {
 			skip_roots_();
 		}
+
+		explicit sieve_iterator(separated_sieve *sieve, trie *nd, size_t r)
+		: sieve_{sieve}, cur_{nd}, r_{r} { }
 
 		bool operator== (sieve_sentinel) const {
 			return !cur_;
@@ -256,6 +262,43 @@ public:
 
 	sieve_sentinel end() {
 		return sieve_sentinel{};
+	}
+
+	sieve_iterator find(vertex_span vs) {
+		assert(vs.size());
+
+		auto r = log_ceil2int(vs.size());
+		if(r >= roots_.size())
+			return sieve_iterator{};
+
+		unsigned int pfx = 0;
+		auto cur = roots_[r];
+		while(cur) {
+			unsigned int i;
+			auto clen = std::min(cur->plen, static_cast<unsigned int>(vs.size()));
+			for(i = pfx; i < clen; i++)
+				if(cur->vs[i] != vs[i])
+					break;
+
+			if(i == clen && cur->vs.size() == vs.size()) {
+				// Test for a match against the full vertex set.
+				for(i = clen; i < vs.size(); i++)
+					if(cur->vs[i] != vs[i])
+						break;
+				if(i == vs.size())
+					return sieve_iterator{this, cur, r};
+			}
+
+			if(i < cur->plen) {
+				// No or partial match. Proceed sideways.
+				cur = cur->next;
+			}else{
+				// Full match. Proceed downwards.
+				pfx = cur->plen;
+				cur = cur->child;
+			}
+		}
+		return sieve_iterator{};
 	}
 
 	template<typename C, typename N, typename F>
