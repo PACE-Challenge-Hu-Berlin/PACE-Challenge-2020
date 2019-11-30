@@ -30,9 +30,9 @@ struct simple_pid_solver {
 	struct feasible_forest {
 		// A representative of a component is the vertex with smallest vertex ID in that component.
 		// As the representatives are ordered (by their vertex ID), they induce an order
-		// on the component.
-		vertex min_rv; // Minimal representative of all components.
-		vertex max_rv; // Maximal representative of all components.
+		// on the components.
+		vertex rv; // Minimal representative of all trees.
+		vertex sweep_rv; // Representative used to sweep over inactive trees.
 		span<vertex> vertices;
 		span<vertex> separator;
 		// Forest only consists of a single tree.

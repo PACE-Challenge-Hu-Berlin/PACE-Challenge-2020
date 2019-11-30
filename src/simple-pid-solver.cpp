@@ -200,7 +200,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				}
 
 			auto rv = staged.vertices.front();
-			join_q_.push({feasible_forest{rv, rv, staged.vertices.as_span(),
+			join_q_.push({feasible_forest{rv, sg_.id_limit(),
+					staged.vertices.as_span(),
 					copy_to_queue(separator_, join_memory_),
 					true, staged.trivial}, ownership::borrowed});
 			join_memory_.seal();
@@ -307,7 +308,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 			protected_marker_.mark(v);
 	}
 
-	auto join_with = [&] (const feasible_tree &tree, vertex min_rv, vertex max_rv) {
+	auto join_with = [&] (const feasible_tree &tree) {
 		int num_total_neighbors = num_forest_neighbors;
 
 		// Determine the neighbors of the tree that we are trying to join.
@@ -353,22 +354,21 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		workset_.clear();
 		workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
 		workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
-		join_q_.push({feasible_forest{min_rv, max_rv,
+
+		// For active trees, it holds that rv < forest.rv; however, for inactive trees,
+		// it it only guaranteed that rv < forest.sweep_rv.
+		// It always holds that forest.rv < forest.sweep_rv.
+		auto rv = tree.vertices.front();
+		assert(rv < forest.sweep_rv);
+		join_q_.push({feasible_forest{std::min(rv, forest.rv), rv,
 				copy_to_queue(workset_, join_memory_),
 				copy_to_queue(separator_, join_memory_),
 				false, false}, ownership::owned});
 		join_memory_.seal();
 	};
-	auto join_with_predecessor = [&] (const feasible_tree &tree) {
+	auto join_with_other = [&] (const feasible_tree &tree) {
 		profiling_timer assemble_timer;
-		auto rv = tree.vertices.front();
-		join_with(tree, rv, forest.max_rv);
-		stats_.time_join_assemble += assemble_timer.elapsed();
-	};
-	auto join_with_successor = [&] (const feasible_tree &tree) {
-		profiling_timer assemble_timer;
-		auto rv = tree.vertices.front();
-		join_with(tree, forest.min_rv, rv);
+		join_with(tree);
 		stats_.time_join_assemble += assemble_timer.elapsed();
 	};
 
@@ -379,22 +379,18 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		return pivot_neighbor_marker_.is_marked(v);
 	};
 
-	// To avoid duplicate joins, we only join trees into this forest that either
-	//    - are ordered before all components of this forest,
-	// or - are ordered after all components of this forest
-	// w.r.t. the order induced by representative vertices.
+	// To avoid duplicate joins, we only join trees into this forest that
+	// are ordered before all components of this forest.
+	// Note that we have to distinguish active and inactive forests.
 
 	// Join only preceeding active trees into this forest.
 	active_trees.list_predecessors(sg_, sieve_query_,
-				k - h - num_forest_neighbors, forest.min_rv,
-				member_predicate, neighbor_predicate, join_with_predecessor);
+				k - h - num_forest_neighbors, forest.rv,
+				member_predicate, neighbor_predicate, join_with_other);
 	// Join both preceeding and succeeding inactive trees into this forest.
 	inactive_trees.list_predecessors(sg_, sieve_query_,
-				k - h - num_forest_neighbors, forest.min_rv,
-				member_predicate, neighbor_predicate, join_with_predecessor);
-	inactive_trees.list_successors(sg_, sieve_query_,
-				k - h - num_forest_neighbors, forest.max_rv,
-				member_predicate, neighbor_predicate, join_with_successor);
+				k - h - num_forest_neighbors, forest.sweep_rv,
+				member_predicate, neighbor_predicate, join_with_other);
 	stats_.time_join += join_timer.elapsed();
 
 	if(!forest.atomic || forest.trivial) {
