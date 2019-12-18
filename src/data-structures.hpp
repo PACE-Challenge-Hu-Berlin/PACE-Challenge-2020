@@ -3,6 +3,8 @@
 #include <cassert>
 #include <vector>
 
+using vertex = unsigned int;
+
 // Data structure to mark integers (e.g., vertices of a graph).
 // Use a timestamping technique to accelerate resets.
 struct boolean_marker {

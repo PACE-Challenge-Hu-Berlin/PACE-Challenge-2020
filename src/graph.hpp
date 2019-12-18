@@ -8,7 +8,6 @@
 
 #include "data-structures.hpp"
 
-using vertex = unsigned int;
 
 // TODO: vertex nil_vertex = static_cast<vertex>(-1);
 
@@ -176,6 +175,28 @@ struct graph {
 		return static_cast<int>(adj_lists_[v].size());
 	}
 
+	friend std::ostream& operator<<(std::ostream& out, const graph& g)
+	{
+		out << "c Graph data\n";
+		unsigned long edge_counter = 0;
+		for(const auto x : g.vertices())
+		{
+			edge_counter += g.degree(x);
+		}
+		assert(!(edge_counter & 2));
+		out << g.num_vertices() << " " << edge_counter/2 << "\n";
+		out << "c Adjacencies:\n";
+		for(auto x : g.vertices())
+		{
+			for(auto y : g.neighbors(x))
+			{
+				if(x > y)continue;
+				out << x << " " << y << "\n";
+			}
+		}
+		out << std::endl;//to flush output
+		return out;
+	}
 private:
 	unsigned int id_limit_ = 0;
 	unsigned int num_vertices_ = 0;
