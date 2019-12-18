@@ -3,6 +3,7 @@
 
 #include "connected-components.hpp"
 #include "simple-pid-solver.hpp"
+#include "precedence-by-inclusion.hpp"
 
 namespace {
 	constexpr bool debug_trees = false;
@@ -57,8 +58,9 @@ namespace {
 	}
 }
 
-simple_pid_solver::simple_pid_solver(graph &g)
-: g_{&g} { }
+//[todo] skip calling the constructor of inclusion_precedence if no_precedence is not set
+simple_pid_solver::simple_pid_solver(graph &g, bool no_precedence)
+: g_{&g}, no_precedence{no_precedence}{ }
 
 int simple_pid_solver::compute_treedepth() {
 	connected_components cc;
@@ -109,13 +111,35 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	staged_trees.clear();
 	eternal_arena_.reset();
 
-	for(vertex v : sg_.vertices()) {
-		if(sg_.degree(v) + 1 > k)
+	static boolean_marker visited_components;
+
+	if(no_precedence)
+	{
+		inclusion_precedence_.compute_trivial(*g_);
+	}
+	else
+	{
+		inclusion_precedence_.compute(*g_);
+	}
+
+	// [todo] check the size of the component + the degree of the component
+	// [todo] generate the inverse graph to avoid having to loop over the whole adjacency list for each SCC
+	visited_components.reset(inclusion_precedence_.num_components());
+	for(vertex  v : sg_.vertices()) {
+		auto cmp_id = inclusion_precedence_.component_id(v);
+
+		if(visited_components.is_marked(cmp_id))
 			continue;
+		visited_components.mark(cmp_id);
+
 		workset_.clear();
-		workset_.push_back(v);
-		staged_tree staged{copy_to_arena(workset_, eternal_arena_), 1, true};
+		for(auto v : inclusion_precedence_.component(cmp_id))
+		{
+			workset_.push_back(v);
+		}
+		staged_tree staged{copy_to_arena(workset_, eternal_arena_), static_cast<int>(inclusion_precedence_.component_size(cmp_id)), true};
 		staged_trees.emplace(staged.vertices, staged);
+
 	}
 
 	for(int h = 1; h < k; h++) {

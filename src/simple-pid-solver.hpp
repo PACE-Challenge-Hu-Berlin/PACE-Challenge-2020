@@ -8,6 +8,7 @@
 #include "graph.hpp"
 #include "mm.hpp"
 #include "utilities.hpp"
+#include "precedence-by-inclusion.hpp"
 
 struct simple_pid_solver {
 	struct statistics {
@@ -54,7 +55,7 @@ struct simple_pid_solver {
 	};
 
 
-	simple_pid_solver(graph &g);
+	simple_pid_solver(graph &g, bool no_precedence);
 
 	int compute_treedepth();
 
@@ -79,6 +80,9 @@ private:
 	queue_memory join_memory_;
 	queue_memory compose_memory_;
 	statistics stats_;
+
+	precedence_by_inclusion inclusion_precedence_;
+	bool no_precedence;
 
 	// The following data structure store all feasible trees of height <= current h.
 	// Set of trees that are currently being expanded. Those have height == current h.

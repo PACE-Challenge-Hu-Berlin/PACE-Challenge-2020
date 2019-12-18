@@ -10,13 +10,17 @@ static const char *usage_text =
 	"Usage: td [OPTIONS] INSTANCE\n"
 	"Possible OPTIONS are:\n"
 	"    --solver SOLVER\n"
-	"        Select a solver algorithm {naive-branching, simple-pid}\n";
+	"        Select a solver algorithm {naive-branching, simple-pid}.\n"
+	"    --no-precedence\n"
+	"        Prune simple-pid to choose separators more carefully.\n";
 
 enum class solver_algorithm {
 	none,
 	naive_branching,
 	simple_pid,
 };
+
+bool no_precedence_ = false;
 
 struct options {
 	const char *instance = nullptr;
@@ -64,7 +68,9 @@ void parse_options(char **p, options &opts) {
 			}else{
 				error("unknown solver algorithm");
 			}
-		}else{
+		} else if(handle_nullary_option("--no-precedence")){
+			no_precedence_ = true;
+		} else{
 			error("unknown command line option");
 		}
 	}
@@ -98,7 +104,7 @@ int main(int argc, char *argv[]) {
 		solve_duration = solve_timer.elapsed();
 	}else{
 		assert(opts.solver == solver_algorithm::simple_pid);
-		simple_pid_solver solver{g};
+		simple_pid_solver solver{g, no_precedence_};
 		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
 		solve_duration = solve_timer.elapsed();
