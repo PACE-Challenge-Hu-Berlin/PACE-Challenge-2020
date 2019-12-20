@@ -163,22 +163,6 @@ struct directed_graph {
 		return out;
 	}
 
-	std::ostream& operator<<(std::ostream& out)
-	{
-		out << "directed graph data\n";
-		out << "Adjacency lists:\n";
-		for(auto x : vertices())
-		{
-			out << x << ": ";
-			for(auto y : neighbors(x))
-			{
-				out << y << " ";
-			}
-			out << "\n";
-		}
-		return out;
-	}
-
 private:
 	unsigned int num_vertices_;
 	std::vector<std::vector<vertex>> adj_lists_;
