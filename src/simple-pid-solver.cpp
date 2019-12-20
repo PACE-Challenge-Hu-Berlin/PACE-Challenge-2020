@@ -58,7 +58,6 @@ namespace {
 	}
 }
 
-//[todo] skip calling the constructor of inclusion_precedence if no_precedence is not set
 simple_pid_solver::simple_pid_solver(graph &g, bool no_precedence)
 : g_{&g}, no_precedence{no_precedence}{ }
 
@@ -111,7 +110,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	staged_trees.clear();
 	eternal_arena_.reset();
 
-	static boolean_marker visited_components;
+	int neighbors_counter;
 
 	if(no_precedence)
 	{
@@ -122,15 +121,43 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		inclusion_precedence_.compute(*g_);
 	}
 
-	// [todo] check the size of the component + the degree of the component
-	// [todo] generate the inverse graph to avoid having to loop over the whole adjacency list for each SCC
-	visited_components.reset(inclusion_precedence_.num_components());
+	pivot_marker_.reset(inclusion_precedence_.num_components());
 	for(vertex  v : sg_.vertices()) {
 		auto cmp_id = inclusion_precedence_.component_id(v);
 
-		if(visited_components.is_marked(cmp_id))
+		if(pivot_marker_.is_marked(cmp_id))
 			continue;
-		visited_components.mark(cmp_id);
+		pivot_marker_.mark(cmp_id);
+		pivot_neighbor_marker_.reset(g_->id_limit());
+		neighbors_counter = 0;
+
+		//Marking the vertices in the component instead of adding 
+		//its size at the end, since the elements of each component 
+		//are pairwise adjacent (in case of neighbors-inclusion)
+		//and if the set has size greater than one
+		//the vertices in the component will be marked anyway
+		for(auto u : inclusion_precedence_.component(cmp_id))
+		{
+			if(!pivot_neighbor_marker_.is_marked(u))
+			{
+				pivot_neighbor_marker_.mark(u);
+				neighbors_counter++;
+			}
+
+			for(auto v : g_->neighbors(u))
+			{
+				if(!pivot_neighbor_marker_.is_marked(v))
+				{
+					pivot_neighbor_marker_.mark(v);
+					neighbors_counter++;
+				}
+			}
+		}
+
+		if(neighbors_counter > k)
+		{
+			continue;
+		}
 
 		workset_.clear();
 		for(auto v : inclusion_precedence_.component(cmp_id))
