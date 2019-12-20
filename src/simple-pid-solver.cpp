@@ -110,15 +110,13 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	staged_trees.clear();
 	eternal_arena_.reset();
 
-	int neighbors_counter;
-
 	if(no_precedence)
 	{
-		inclusion_precedence_.compute_trivial(*g_);
+		inclusion_precedence_.compute_trivial(sg_);
 	}
 	else
 	{
-		inclusion_precedence_.compute(*g_);
+		inclusion_precedence_.compute(sg_);
 	}
 
 	pivot_marker_.reset(inclusion_precedence_.num_components());
@@ -128,14 +126,15 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		if(pivot_marker_.is_marked(cmp_id))
 			continue;
 		pivot_marker_.mark(cmp_id);
-		pivot_neighbor_marker_.reset(g_->id_limit());
-		neighbors_counter = 0;
 
-		//Marking the vertices in the component instead of adding 
-		//its size at the end, since the elements of each component 
-		//are pairwise adjacent (in case of neighbors-inclusion)
-		//and if the set has size greater than one
-		//the vertices in the component will be marked anyway
+		if(!inclusion_precedence_.is_maximal(cmp_id))
+		{
+			++stats_.num_pruned_by_precedence;
+			continue;
+		}
+
+		pivot_neighbor_marker_.reset(g_->id_limit());
+		int neighbors_counter = 0;
 		for(auto u : inclusion_precedence_.component(cmp_id))
 		{
 			if(!pivot_neighbor_marker_.is_marked(u))
@@ -153,21 +152,21 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				}
 			}
 		}
-
 		if(neighbors_counter > k)
 		{
 			continue;
 		}
 
 		workset_.clear();
-		for(auto v : inclusion_precedence_.component(cmp_id))
+		for(auto u : inclusion_precedence_.component(cmp_id))
 		{
-			workset_.push_back(v);
+			workset_.push_back(u);
 		}
 		staged_tree staged{copy_to_arena(workset_, eternal_arena_), static_cast<int>(inclusion_precedence_.component_size(cmp_id)), true};
 		staged_trees.emplace(staged.vertices, staged);
-
 	}
+	
+	std::cerr <<  "Pruned components from dynamic programming base " << stats_.num_pruned_by_precedence << std::endl;
 
 	for(int h = 1; h < k; h++) {
 		std::cerr << "constructing k = " << k << ", h = " << h << std::endl;
@@ -227,7 +226,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				feasible_composition comp = compose_q_.front().first;
 				ownership comp_ownership = compose_q_.front().second;
 				compose_q_.pop();
-				compose_(k, h, comp);
+				compose_(k, comp);
 				num_compose_++;
 
 				if(comp_ownership == ownership::owned)
@@ -402,7 +401,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	}
 }
 
-void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
+void simple_pid_solver::compose_(int k, feasible_composition &comp) {
 	profiling_timer compose_timer;
 
 	pivot_marker_.reset(sg_.id_limit());
@@ -433,6 +432,20 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 
 		if(comp.h + 1 + num_composed_neighbors > k) {
 			++stats_.num_pruned_compositions;
+			continue;
+		}
+
+		bool precedence_okay = true;
+		for(auto v : inclusion_precedence_.vertex_successors(u))
+		{
+			if(!pivot_marker_.is_marked(v) && !pivot_neighbor_marker_.is_marked(v))
+			{
+				precedence_okay = false;
+				break;
+			}
+		}
+		if(!precedence_okay)
+		{
 			continue;
 		}
 

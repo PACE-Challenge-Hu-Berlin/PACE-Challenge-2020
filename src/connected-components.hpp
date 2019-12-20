@@ -202,7 +202,7 @@ private:
 				}
 				stack_.pop();
 				scc_lists_.push_back(u);
-				scc_id_[v] = scc_indices_.size() - 1;
+				scc_id_[u] = scc_indices_.size() - 1;
 
 				done[u] = 1;
 				in_stack[u] = 0;

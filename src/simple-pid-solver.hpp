@@ -15,6 +15,7 @@ struct simple_pid_solver {
 		int64_t num_empty_separator = 0;
 		int64_t num_pruned_forests = 0;
 		int64_t num_pruned_compositions = 0;
+		int64_t num_pruned_by_precedence = 0;
 		int64_t num_protected_separators = 0;
 		profiling_duration time_join{};
 		profiling_duration time_join_assemble{};
@@ -72,7 +73,7 @@ private:
 
 	bool decide_treedepth_(int k);
 	void join_(int k, int h, feasible_forest &forest);
-	void compose_(int k, int h, feasible_composition &comp);
+	void compose_(int k, feasible_composition &comp);
 
 	graph *g_;
 	graph sg_;
