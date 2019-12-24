@@ -217,27 +217,27 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 
 		while(!join_q_.empty()) {
 			feasible_forest forest = join_q_.front().first;
-			ownership forest_ownership = compose_q_.front().second;
+			ownership forest_ownership = join_q_.front().second;
 			join_q_.pop();
 			join_(k, h, forest);
 			num_join_++;
 
-			while(!compose_q_.empty()) {
-				feasible_composition comp = compose_q_.front().first;
-				ownership comp_ownership = compose_q_.front().second;
-				compose_q_.pop();
-				compose_(k, comp);
-				num_compose_++;
-
-				if(comp_ownership == ownership::owned)
-					free_in_queue(comp.prefix, compose_memory_);
-				compose_memory_.reclaim();
-			}
 
 			if(forest_ownership == ownership::owned)
 				free_in_queue(forest.vertices, join_memory_);
 			free_in_queue(forest.separator, join_memory_);
 			join_memory_.reclaim();
+		}
+		while(!compose_q_.empty()) {
+			feasible_composition comp = compose_q_.front().first;
+			ownership comp_ownership = compose_q_.front().second;
+			compose_q_.pop();
+			compose_(k, comp);
+			num_compose_++;
+
+			if(comp_ownership == ownership::owned)
+				free_in_queue(comp.prefix, compose_memory_);
+			compose_memory_.reclaim();
 		}
 
 		std::cerr << "    staged " << num_stage_
