@@ -44,6 +44,7 @@ struct simple_pid_solver {
 	struct feasible_composition {
 		span<vertex> vertices;
 		span<vertex> prefix;
+		span<vertex> separator;
 		int h;
 		bool trivial;
 	};
@@ -53,6 +54,7 @@ struct simple_pid_solver {
 		int h;
 		// Vertices can only be arranged in a path.
 		bool trivial;
+		span<vertex> separator;
 	};
 
 
