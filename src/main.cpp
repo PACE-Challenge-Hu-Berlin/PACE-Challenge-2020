@@ -91,7 +91,8 @@ int main(int argc, char *argv[]) {
 		std::ifstream ifs{opts.instance};
 		if(!ifs)
 			throw std::runtime_error("could not open instance file");
-		read_pace_graph(ifs, g);
+		if(!read_pace_graph(ifs, g))
+			exit(1);
 	}
 	std::cerr << "graph has " << g.num_vertices() << " vertices" << std::endl;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -8,7 +9,7 @@
 
 // AvdG: Parsing is always tedious.
 // The following parser works but it is not very robust against syntax errors.
-void read_pace_graph(std::istream &ifs, graph &g) {
+bool read_pace_graph(std::istream &ifs, graph &g) {
 	std::string l; // Current line.
 	std::string w; // Current word (for prefixed lines).
 
@@ -34,20 +35,26 @@ void read_pace_graph(std::istream &ifs, graph &g) {
 
 	// Parse the initial "p"-prefixed line.
 	bool found_p = false;
+	int n, m;
 	while(std::getline(ifs, l)) {
 		if(is_whitespace())
 			continue;
 		std::istringstream iss{l};
-		if(!is_prefixed())
-			throw std::runtime_error("expected only prefixed lines before 'p'");
+		if(!is_prefixed()) {
+			std::cerr << "expected only prefixed lines before 'p'" << std::endl;
+			return false;
+		}
 		iss >> w;
 		if(w == "c") {
 			continue;
 		}else if(w == "p") {
-			int n, m;
 			iss >> w;
 			iss >> n;
 			iss >> m;
+			if(!iss) {
+				std::cerr << "i/o error" << std::endl;
+				return false;
+			}
 			// TODO: Make sure that values are parsed correctly.
 			// TODO: Make sure that line ends here (except for whitespace).
 
@@ -57,14 +64,18 @@ void read_pace_graph(std::istream &ifs, graph &g) {
 			found_p = true;
 			break;
 		}else{
-			throw std::runtime_error("expected only 'c' prefixes before 'p'");
+			std::cerr << "expected only 'c' prefixes before 'p'" << std::endl;
+			return false;
 		}
 	}
 
-	if(!found_p)
-		throw std::runtime_error("found no 'p' line");
+	if(!found_p) {
+		std::cerr << "found no 'p' line" << std::endl;
+		return false;
+	}
 
 	// Parse all edges.
+	std::set<std::pair<int, int>> edge_set;
 	while(std::getline(ifs, l)) {
 		if(is_whitespace())
 			continue;
@@ -73,8 +84,35 @@ void read_pace_graph(std::istream &ifs, graph &g) {
 			int u, v;
 			iss >> u;
 			iss >> v;
+			if(!iss) {
+				std::cerr << "i/o error" << std::endl;
+				return false;
+			}
 			// TODO: Make sure that values are parsed correctly.
 			// TODO: Make sure that line ends here (except for whitespace).
+
+			if(u <= 0 || u > n) {
+				std::cerr << "vertex " << u << " out of bounds" << std::endl;
+				return false;
+			}
+			if(v <= 0 || v > n) {
+				std::cerr << "vertex " << v << " out of bounds" << std::endl;
+				return false;
+			}
+
+			if(u == v) {
+				std::cerr << "ignoring self loop at " << u << std::endl;
+				continue;
+			}
+			if(u > v)
+				std::swap(u, v);
+
+			bool unique;
+			std::tie(std::ignore, unique) = edge_set.insert({u, v});
+			if(!unique) {
+				std::cerr << "ignoring duplicate edge {" << u << ", " << v << "}" << std::endl;
+				continue;
+			}
 
 			g.add_edge(u, v);
 		}else{
@@ -82,8 +120,11 @@ void read_pace_graph(std::istream &ifs, graph &g) {
 			if(w == "c") {
 				continue;
 			}else{
-				throw std::runtime_error("expected only 'c' prefixes after 'p'");
+				std::cerr << "expected only 'c' prefixes after 'p'" << std::endl;
+				return false;
 			}
 		}
 	}
+
+	return true;
 }
