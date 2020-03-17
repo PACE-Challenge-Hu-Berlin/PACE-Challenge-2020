@@ -66,6 +66,8 @@ simple_pid_solver::simple_pid_solver(graph &g, bool no_precedence)
 : g_{&g}, no_precedence{no_precedence}{ }
 
 int simple_pid_solver::compute_treedepth() {
+	decomp_.resize(g_->id_limit(), nil_vertex());
+
 	kernelization kern;
 	kern.compute(*g_);
 
@@ -268,12 +270,61 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		active_trees.clear();
 	}
 
-	for(const auto &entry : staged_trees) {
-		const auto &staged = entry.second;
-		if(staged.vertices.size() == sg_.num_vertices())
-			return true;
+	return recover_decomposition_();
+}
+
+bool simple_pid_solver::recover_decomposition_() {
+	workset_.clear();
+	for(vertex v : sg_.vertices())
+		workset_.push_back(v);
+	auto root_it = staged_trees.find(vertex_key{workset_});
+	if(root_it == staged_trees.end())
+		return false;
+
+	for(vertex v : sg_.vertices())
+		decomp_[v] = nil_vertex();
+
+	std::stack<std::tuple<vertex, span<vertex>, span<vertex>>> stack;
+	stack.push({0, root_it->second.vertices.as_span(), root_it->second.separator});
+
+	connected_components cc;
+	while(!stack.empty()) {
+		auto e = stack.top();
+		stack.pop();
+
+		// u is the root of the current subtree.
+		// Arrange the separator in an arbitrary order.
+		vertex u = std::get<0>(e);
+		for(vertex v : std::get<2>(e)) {
+			decomp_[v] = u;
+			u = v;
+		}
+
+		pivot_marker_.reset(sg_.id_limit());
+		for(vertex v : std::get<1>(e))
+			pivot_marker_.mark(v);
+		for(vertex v : std::get<2>(e)) {
+			assert(pivot_marker_.is_marked(v));
+			pivot_marker_.unmark(v);
+		}
+
+		cc.compute(induced_subgraph{sg_, pivot_marker_});
+		if(!cc.num_components())
+			continue;
+
+		for(size_t i = 0; i < cc.num_components(); ++i) {
+			workset_.clear();
+			for(vertex v : cc.component(i))
+				workset_.push_back(v);
+			std::sort(workset_.begin(), workset_.end());
+
+			auto it = staged_trees.find(vertex_key{workset_});
+			assert(it != staged_trees.end());
+			stack.push({u, it->second.vertices.as_span(), it->second.separator});
+		}
 	}
-	return false;
+
+	return true;
 }
 
 void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {

@@ -7,6 +7,8 @@
 
 using vertex = unsigned int;
 
+inline constexpr vertex nil_vertex() { return static_cast<vertex>(-1); }
+
 // Lightweight reference to a contiguous array.
 template<typename T>
 struct span {

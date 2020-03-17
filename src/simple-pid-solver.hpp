@@ -62,6 +62,10 @@ struct simple_pid_solver {
 
 	int compute_treedepth();
 
+	const std::vector<vertex> &decomposition() {
+		return decomp_;
+	}
+
 	const statistics &stats() {
 		return stats_;
 	}
@@ -74,6 +78,7 @@ private:
 	};
 
 	bool decide_treedepth_(int k);
+	bool recover_decomposition_();
 	void join_(int k, int h, feasible_forest &forest);
 	void compose_(int k, feasible_composition &comp);
 
@@ -82,6 +87,7 @@ private:
 	memory_arena eternal_arena_;
 	queue_memory join_memory_;
 	queue_memory compose_memory_;
+	std::vector<vertex> decomp_;
 	statistics stats_;
 
 	precedence_by_inclusion inclusion_precedence_;

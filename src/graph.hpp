@@ -8,9 +8,6 @@
 
 #include "data-structures.hpp"
 
-
-// TODO: vertex nil_vertex = static_cast<vertex>(-1);
-
 struct graph {
 	// Range that iterates over all present vertices of the graph.
 	struct vertex_range {

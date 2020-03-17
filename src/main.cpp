@@ -97,19 +97,25 @@ int main(int argc, char *argv[]) {
 	std::cerr << "graph has " << g.num_vertices() << " vertices" << std::endl;
 
 	int solution;
+	std::vector<vertex> decomp;
 	profiling_duration solve_duration;
 	if(opts.solver == solver_algorithm::naive_branching) {
 		naive_branching_solver solver{g};
 		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
+		decomp.resize(g.id_limit(), nil_vertex());
 		solve_duration = solve_timer.elapsed();
 	}else{
 		assert(opts.solver == solver_algorithm::simple_pid);
 		simple_pid_solver solver{g, no_precedence_};
 		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
+		decomp = solver.decomposition();
 		solve_duration = solve_timer.elapsed();
 	}
-	std::cout << "s " << solution << std::endl;
+	std::cout << solution << std::endl;
 	std::cerr << "time: " << print_time(solve_duration) << std::endl;
+
+	for(size_t v = 1; v < g.id_limit(); ++v)
+		std::cout << decomp[v] << std::endl;
 }
