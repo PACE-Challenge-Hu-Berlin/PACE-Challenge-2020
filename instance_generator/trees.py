@@ -37,7 +37,16 @@ class TreeNode:
         max_node, max_depth = None, None
 
         while len(open_) > 0:
-            node, depth = open_.pop()
+            min_index = -1
+            min_depth = 0
+            for i in range(len(open_)):
+                node2, depth2 = open_[i]
+                if min_index == -1 or depth2 < min_depth:
+                    min_depth = depth2
+                    min_index = i
+
+            node, depth = open_.pop(min_index)
+
             if node in done:
                 continue
             done.append(node)
