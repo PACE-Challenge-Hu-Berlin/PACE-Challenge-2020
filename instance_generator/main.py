@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import graph
 import os.path
 import argparse
