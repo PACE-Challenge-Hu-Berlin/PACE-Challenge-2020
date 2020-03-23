@@ -64,7 +64,7 @@ class Graph:
                 open_.append((node2, path + [node2.i]))
 
         for i in range(vertices):
-            if not paths[i]:
+            if len(paths[i]) == 0:
                 print("Something went wrong while analyzing the tree")
                 return
 

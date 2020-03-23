@@ -84,12 +84,13 @@ def random_tree(vertices, seed):
                 d[i] -= 1
                 d[j] -= 1
                 break
-    v, w = 0, 0
+    v, w = -1, -1
     for i in range(vertices):
         if d[i] == 0:
-            v = i
-        else:
-            w = i
+            if v == -1:
+                v = i
+            else:
+                w = i
 
     tree[w].add_child(tree[v])
     tree[v].add_child(tree[w])
