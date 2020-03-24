@@ -163,6 +163,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		{
 			workset_.push_back(u);
 		}
+		std::sort(workset_.begin(), workset_.end());
+
 		staged_tree staged{copy_to_arena(workset_, eternal_arena_),
 				static_cast<int>(inclusion_precedence_.component_size(cmp_id)), true,
 				copy_to_arena(workset_, eternal_arena_)};
