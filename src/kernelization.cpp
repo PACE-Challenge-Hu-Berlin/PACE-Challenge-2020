@@ -30,6 +30,28 @@ void kernelization::compute(const graph &ig) {
 	std::cerr << "    kernelization time: " << print_time(elapsed) << std::endl;
 }
 
+void kernelization::compute_trivial(const graph &ig) {
+	std::cerr << "computing kernel" << std::endl;
+	coarse_profiling_timer timer;
+	q_.push(ig);
+
+	while(!q_.empty()) {
+		graph g = std::move(q_.front());
+		q_.pop();
+		std::cerr << "considering subgraph of size " << g.num_vertices() << std::endl;
+
+		if(decompose_(g))
+			continue;
+
+		components_.push_back(std::move(g));
+	}
+	auto elapsed = timer.elapsed();
+
+	std::cerr << "kernalization finished" << std::endl;
+	std::cerr << "    components: " << components_.size() << std::endl;
+	std::cerr << "    kernelization time: " << print_time(elapsed) << std::endl;
+}
+
 bool kernelization::decompose_(graph &g) {
 	connected_components cc;
 	cc.compute(g);

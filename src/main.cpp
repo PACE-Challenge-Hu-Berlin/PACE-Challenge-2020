@@ -20,11 +20,11 @@ enum class solver_algorithm {
 	simple_pid,
 };
 
-bool no_precedence_ = false;
-
 struct options {
 	const char *instance = nullptr;
 	solver_algorithm solver = solver_algorithm::naive_branching;
+	bool no_kernelization = false;
+	bool no_precedence = false;
 };
 
 void parse_options(char **p, options &opts) {
@@ -68,8 +68,10 @@ void parse_options(char **p, options &opts) {
 			}else{
 				error("unknown solver algorithm");
 			}
+		} else if(handle_nullary_option("--no-kernelization")){
+			opts.no_kernelization = true;
 		} else if(handle_nullary_option("--no-precedence")){
-			no_precedence_ = true;
+			opts.no_precedence = true;
 		} else{
 			error("unknown command line option");
 		}
@@ -101,13 +103,17 @@ int main(int argc, char *argv[]) {
 	profiling_duration solve_duration;
 	if(opts.solver == solver_algorithm::naive_branching) {
 		naive_branching_solver solver{g};
+		
 		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
 		decomp.resize(g.id_limit(), nil_vertex());
 		solve_duration = solve_timer.elapsed();
 	}else{
 		assert(opts.solver == solver_algorithm::simple_pid);
-		simple_pid_solver solver{g, no_precedence_};
+		simple_pid_solver solver{g};
+		solver.no_kernelization = opts.no_kernelization;
+		solver.no_inclusion_precedence = opts.no_precedence;
+
 		coarse_profiling_timer solve_timer;
 		solution = solver.compute_treedepth();
 		decomp = solver.decomposition();

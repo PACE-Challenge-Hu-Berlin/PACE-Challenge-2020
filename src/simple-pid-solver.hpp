@@ -58,7 +58,7 @@ struct simple_pid_solver {
 	};
 
 
-	simple_pid_solver(graph &g, bool no_precedence);
+	simple_pid_solver(graph &g);
 
 	int compute_treedepth();
 
@@ -69,6 +69,10 @@ struct simple_pid_solver {
 	const statistics &stats() {
 		return stats_;
 	}
+
+	bool no_kernelization = false;
+	bool no_inclusion_precedence = false;
+	bool no_protected_separators = false;
 
 private:
 	enum class ownership {
@@ -91,7 +95,6 @@ private:
 	statistics stats_;
 
 	precedence_by_inclusion inclusion_precedence_;
-	bool no_precedence;
 
 	// The following data structure store all feasible trees of height <= current h.
 	// Set of trees that are currently being expanded. Those have height == current h.

@@ -62,14 +62,17 @@ namespace {
 	}
 }
 
-simple_pid_solver::simple_pid_solver(graph &g, bool no_precedence)
-: g_{&g}, no_precedence{no_precedence}{ }
+simple_pid_solver::simple_pid_solver(graph &g)
+: g_{&g} { }
 
 int simple_pid_solver::compute_treedepth() {
 	decomp_.resize(g_->id_limit(), nil_vertex());
 
 	kernelization kern;
-	kern.compute(*g_);
+	if(no_kernelization)
+		kern.compute_trivial(*g_);
+	else
+		kern.compute(*g_);
 
 	int td = 0;
 	for(size_t i = 0; i < kern.num_components(); ++i) {
@@ -111,7 +114,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 	staged_trees.clear();
 	eternal_arena_.reset();
 
-	if(no_precedence)
+	if(no_inclusion_precedence)
 	{
 		inclusion_precedence_.compute_trivial(sg_);
 	}
@@ -350,16 +353,17 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	}
 
 	protected_marker_.reset(sg_.id_limit());
-	for(vertex v : forest.separator) {
-		bool protect = true;
-		for(vertex w : sg_.neighbors(v))
-			if(!pivot_marker_.is_marked(w) && !pivot_neighbor_marker_.is_marked(w)) {
-				protect = false;
-				break;
-			}
-		if(protect)
-			protected_marker_.mark(v);
-	}
+	if(!no_protected_separators)
+		for(vertex v : forest.separator) {
+			bool protect = true;
+			for(vertex w : sg_.neighbors(v))
+				if(!pivot_marker_.is_marked(w) && !pivot_neighbor_marker_.is_marked(w)) {
+					protect = false;
+					break;
+				}
+			if(protect)
+				protected_marker_.mark(v);
+		}
 
 	auto join_with = [&] (const feasible_tree &tree) {
 		int num_total_neighbors = num_forest_neighbors;

@@ -10,6 +10,7 @@ struct kernelization {
 	};
 
 	void compute(const graph &ig);
+	void compute_trivial(const graph &ig);
 
 	size_t num_components() {
 		return components_.size();
