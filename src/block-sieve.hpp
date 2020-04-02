@@ -337,10 +337,11 @@ private:
 		nd->new_neighbors.clear();
 		nd->self_overlap = 0;
 		for(unsigned int k = pfx; k < nd->plen; k++) {
-			if(marker_.is_marked(nd->vs[k]))
+			if(marker_.is_marked(nd->vs[k])) {
+				nd->self_overlap++; // We assume that vertices are not duplicated.
 				continue;
+			}
 			marker_.mark(nd->vs[k]);
-			nd->self_overlap++; // We assume that vertices are not duplicated.
 		}
 		for(unsigned int k = pfx; k < nd->plen; k++)
 			for(vertex w : g.neighbors(nd->vs[k])) {
