@@ -1,1 +1,2 @@
+option('td-sanity-checks', type: 'boolean', value: 'false')
 option('td-static', type: 'boolean', value: 'false')
