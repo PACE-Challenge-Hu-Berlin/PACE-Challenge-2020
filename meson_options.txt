@@ -1,0 +1,1 @@
+option('td-static', type: 'boolean', value: 'false')
