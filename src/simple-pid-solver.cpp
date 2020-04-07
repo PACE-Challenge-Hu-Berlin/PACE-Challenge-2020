@@ -11,6 +11,66 @@ namespace {
 	constexpr bool debug_trees = false;
 
 	// Helper class to print object during debugging.
+	struct print_staged {
+		friend std::ostream &operator<< (std::ostream &os, const print_staged &self) {
+			os << "({";
+			for(size_t i = 0; i < self.p_->vertices.size(); i++) {
+				if(i > 0)
+					os << ", ";
+				os << self.p_->vertices[i];
+			}
+			os << "}, h=" << self.p_->h;
+			if(self.p_->trivial)
+				os << ", trivial";
+			os << ")";
+			return os;
+		}
+
+		print_staged(const simple_pid_solver::staged_tree &p)
+		: p_{&p} { }
+
+	private:
+		const simple_pid_solver::staged_tree *p_;
+	};
+
+	struct print_forest {
+		friend std::ostream &operator<< (std::ostream &os, const print_forest &self) {
+			os << "({";
+			for(size_t i = 0; i < self.p_->vertices.size(); i++) {
+				if(i > 0)
+					os << ", ";
+				os << self.p_->vertices[i];
+			}
+			os << "}, R=" << self.p_->rv << ", S=" << self.p_->sweep_rv << ")";
+			return os;
+		}
+
+		print_forest(const simple_pid_solver::feasible_forest &p)
+		: p_{&p} { }
+
+	private:
+		const simple_pid_solver::feasible_forest *p_;
+	};
+
+	struct print_tree {
+		friend std::ostream &operator<< (std::ostream &os, const print_tree &self) {
+			os << "({";
+			for(size_t i = 0; i < self.p_->vertices.size(); i++) {
+				if(i > 0)
+					os << ", ";
+				os << self.p_->vertices[i];
+			}
+			os << "})";
+			return os;
+		}
+
+		print_tree(const simple_pid_solver::feasible_tree &p)
+		: p_{&p} { }
+
+	private:
+		const simple_pid_solver::feasible_tree *p_;
+	};
+
 	struct print_composition {
 		friend std::ostream &operator<< (std::ostream &os, const print_composition &self) {
 			os << "({";
@@ -18,6 +78,18 @@ namespace {
 				if(i > 0)
 					os << ", ";
 				os << self.p_->vertices[i];
+			}
+			os << "}, {";
+			for(size_t i = 0; i < self.p_->separator.size(); i++) {
+				if(i > 0)
+					os << ", ";
+				os << self.p_->separator[i];
+			}
+			os << "}, {";
+			for(size_t i = 0; i < self.p_->prefix.size(); i++) {
+				if(i > 0)
+					os << ", ";
+				os << self.p_->prefix[i];
 			}
 			os << "}, h=" << self.p_->h;
 			if(self.p_->trivial)
