@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "config.hpp"
 #include "data-structures.hpp"
 #include "graph.hpp"
 
@@ -367,6 +368,29 @@ private:
 			return true;
 		};
 
+		auto validate_bound = [&] (trie *nd) -> int {
+			marker_.reset(g.id_limit());
+			for(unsigned int k = 0; k < nd->plen; k++) {
+				auto v = nd->vs[k];
+				assert(!marker_.is_marked(v));
+				marker_.mark(v);
+			}
+
+			unsigned int n = 0;
+			for(unsigned int k = 0; k < nd->plen; k++) {
+				auto v = nd->vs[k];
+				for(vertex w : g.neighbors(v)) {
+					if(marker_.is_marked(w))
+						continue;
+					marker_.mark(w);
+					if(!neighbor(w))
+						n++;
+				}
+			}
+
+			return nd->plen + n;
+		};
+
 		query.stack.clear();
 		for(size_t r = 0; r < roots_.size(); ++r) {
 			trie *cur = roots_[r];
@@ -392,10 +416,14 @@ private:
 					if(is_disjoint_separated(cur, pfx, cur->plen)) {
 						assert(cur->self_overlap <= cur->plen - pfx);
 						int b = pb - cur->self_overlap + (cur->plen - pfx);
+						assert(b >= pb);
 						for(vertex w : cur->new_neighbors) {
+							assert(!enable_sanity_checks || !contains(w));
 							if(!neighbor(w))
 								b++;
 						}
+						assert(!enable_sanity_checks || validate_bound(cur) == b);
+
 						if(b <= m + (1 << r)) {
 							if(is_disjoint_separated(cur, cur->plen, cur->vs.size()))
 								functor(cur->element);

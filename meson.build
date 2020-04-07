@@ -9,8 +9,8 @@ if get_option('td-static')
 endif
 
 configure_file(configuration: conf_data,
-	input: 'config.h.in',
-	output: 'config.h')
+	input: 'config.hpp.in',
+	output: 'config.hpp')
 
 executable('td',
 		'src/kernelization.cpp',
