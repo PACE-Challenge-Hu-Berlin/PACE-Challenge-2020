@@ -45,15 +45,11 @@ struct simple_pid_solver {
 		span<vertex> vertices;
 		span<vertex> prefix;
 		span<vertex> separator;
-		int h;
-		bool trivial;
 	};
 
 	struct staged_tree {
 		vertex_key vertices;
 		int h;
-		// Vertices can only be arranged in a path.
-		bool trivial;
 		span<vertex> separator;
 	};
 
@@ -84,7 +80,7 @@ private:
 	bool decide_treedepth_(int k);
 	bool recover_decomposition_();
 	void join_(int k, int h, feasible_forest &forest);
-	void compose_(int k, feasible_composition &comp);
+	void compose_(int k, int h, feasible_composition &comp);
 
 	graph *g_;
 	graph sg_;
