@@ -348,7 +348,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 
 			if(forest_ownership == ownership::owned)
 				free_in_queue(forest.vertices, join_memory_);
-			free_in_queue(forest.separator, join_memory_);
+			free_in_queue(forest.candidates, join_memory_);
 			join_memory_.reclaim();
 		}
 
@@ -456,7 +456,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	protected_marker_.reset(sg_.id_limit());
 	bool has_protected_separators = false;
 	if(!no_protected_separators)
-		for(vertex v : forest.separator) {
+		for(vertex v : forest.candidates) {
 			bool protect = true;
 			for(vertex w : sg_.neighbors(v))
 				if(!pivot_marker_.is_marked(w) && !pivot_neighbor_marker_.is_marked(w)) {
@@ -499,7 +499,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 
 		separator_.clear();
-		for(vertex v : forest.separator)
+		for(vertex v : forest.candidates)
 			if(associate_neighbor_marker_.is_marked(v)) {
 				separator_.push_back(v);
 			}else if(protected_marker_.is_marked(v)) {
@@ -558,7 +558,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		if(has_protected_separators) {
 			separator_.clear();
 			candidates_.clear();
-			for(vertex v : forest.separator) {
+			for(vertex v : forest.candidates) {
 				if(protected_marker_.is_marked(v)) {
 					separator_.push_back(v);
 				}else{
@@ -583,7 +583,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}else{
 			compose_q_.push({feasible_composition{forest.vertices,
 					span<vertex>{},
-					forest.separator}, ownership::borrowed});
+					forest.candidates}, ownership::borrowed});
 			compose_memory_.seal();
 		}
 	}

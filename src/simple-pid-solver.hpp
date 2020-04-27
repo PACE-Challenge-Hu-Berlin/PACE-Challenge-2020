@@ -34,7 +34,7 @@ struct simple_pid_solver {
 		vertex rv; // Minimal representative of all trees.
 		vertex sweep_rv; // Representative used to sweep over inactive trees.
 		span<vertex> vertices;
-		span<vertex> separator;
+		span<vertex> candidates;
 		// Forest only consists of a single tree.
 		bool atomic;
 	};
