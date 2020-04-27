@@ -37,8 +37,6 @@ struct simple_pid_solver {
 		span<vertex> separator;
 		// Forest only consists of a single tree.
 		bool atomic;
-		// Forest is atomic and the only tree is a path.
-		bool trivial;
 	};
 
 	struct feasible_composition {

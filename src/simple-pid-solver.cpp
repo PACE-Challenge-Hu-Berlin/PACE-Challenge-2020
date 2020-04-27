@@ -253,30 +253,6 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				all_trees_inactive = false;
 			if(staged.h != h)
 				continue;
-
-			// Find the neighbor set of the tree to turn it into an atomic forest.
-			pivot_marker_.reset(sg_.id_limit());
-			pivot_neighbor_marker_.reset(sg_.id_limit());
-			separator_.clear();
-			for(vertex v : staged.vertices)
-				pivot_marker_.mark(v);
-			for(vertex v : staged.vertices)
-				for(vertex w : sg_.neighbors(v)) {
-					if(pivot_marker_.is_marked(w))
-						continue;
-					if(pivot_neighbor_marker_.is_marked(w))
-						continue;
-					pivot_neighbor_marker_.mark(w);
-					separator_.push_back(w);
-				}
-
-			auto rv = staged.vertices.front();
-			auto trivial = (static_cast<int>(staged.vertices.size()) == h);
-			join_q_.push({feasible_forest{rv, sg_.id_limit(),
-					staged.vertices.as_span(),
-					copy_to_queue(separator_, join_memory_),
-					true, trivial}, ownership::borrowed});
-			join_memory_.seal();
 			active_trees.insert(sg_, staged.vertices, feasible_tree{staged.vertices, staged.h});
 		}
 
@@ -290,6 +266,64 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		std::cerr << "    there are "
 				<< active_trees.size() << " active trees, "
 				<< inactive_trees.size() << " inactive trees" << std::endl;
+
+		for(const auto &tree : active_trees) {
+			if(tree.h != h)
+				continue;
+
+			// Find the neighbor set of the tree to turn it into an atomic forest.
+			pivot_marker_.reset(sg_.id_limit());
+			pivot_neighbor_marker_.reset(sg_.id_limit());
+			candidates_.clear();
+			for(vertex v : tree.vertices)
+				pivot_marker_.mark(v);
+			for(vertex v : tree.vertices)
+				for(vertex w : sg_.neighbors(v)) {
+					if(pivot_marker_.is_marked(w))
+						continue;
+					if(pivot_neighbor_marker_.is_marked(w))
+						continue;
+					pivot_neighbor_marker_.mark(w);
+					candidates_.push_back(w);
+				}
+
+			auto trivial = (static_cast<int>(tree.vertices.size()) == h);
+			if(trivial) {
+				for(vertex u : candidates_) {
+					associate_neighbor_marker_.reset(sg_.id_limit());
+					int tree_neighbors = static_cast<int>(candidates_.size()) - 1;
+					for(vertex v : sg_.neighbors(u)) {
+						if(pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v))
+							continue;
+						assert(v != u);
+						if(associate_neighbor_marker_.is_marked(v))
+							continue;
+						associate_neighbor_marker_.mark(v);
+						++tree_neighbors;
+					}
+
+					if(h + 1 + tree_neighbors > k)
+						continue;
+
+					workset_.clear();
+					workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
+					workset_.push_back(u);
+					std::sort(workset_.begin(), workset_.end());
+
+					separator_.clear();
+					separator_.push_back(u);
+
+					do_stage_(h + 1, workset_, separator_);
+				}
+			}
+
+			auto rv = tree.vertices.front();
+			join_q_.push({feasible_forest{rv, sg_.id_limit(),
+					tree.vertices.as_span(),
+					copy_to_queue(candidates_, join_memory_),
+					true}, ownership::borrowed});
+			join_memory_.seal();
+		}
 
 		while(!join_q_.empty()) {
 			feasible_forest forest = join_q_.front().first;
@@ -490,7 +524,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		join_q_.push({feasible_forest{std::min(rv, forest.rv), rv,
 				copy_to_queue(workset_, join_memory_),
 				copy_to_queue(separator_, join_memory_),
-				false, false}, ownership::owned});
+				false}, ownership::owned});
 		join_memory_.seal();
 	};
 	auto join_with_other = [&] (const feasible_tree &tree) {
@@ -520,7 +554,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 				member_predicate, neighbor_predicate, join_with_other);
 	stats_.time_join += join_timer.elapsed();
 
-	if(!forest.atomic || forest.trivial) {
+	if(!forest.atomic) {
 		if(has_protected_separators) {
 			separator_.clear();
 			candidates_.clear();
