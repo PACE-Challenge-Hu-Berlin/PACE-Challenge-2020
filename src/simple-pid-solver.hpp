@@ -41,8 +41,8 @@ struct simple_pid_solver {
 
 	struct feasible_composition {
 		span<vertex> vertices;
-		span<vertex> prefix;
 		span<vertex> separator;
+		span<vertex> candidates;
 	};
 
 	struct staged_tree {

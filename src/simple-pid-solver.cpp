@@ -83,10 +83,10 @@ namespace {
 				os << self.p_->separator[i];
 			}
 			os << "}, candidates={";
-			for(size_t i = 0; i < self.p_->prefix.size(); i++) {
+			for(size_t i = 0; i < self.p_->candidates.size(); i++) {
 				if(i > 0)
 					os << ", ";
-				os << self.p_->prefix[i];
+				os << self.p_->candidates[i];
 			}
 			os << "})";
 			return os;
@@ -340,8 +340,8 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				num_compose_++;
 
 				if(comp_ownership == ownership::owned) {
-					free_in_queue(comp.prefix, compose_memory_);
 					free_in_queue(comp.separator, compose_memory_);
+					free_in_queue(comp.candidates, compose_memory_);
 				}
 				compose_memory_.reclaim();
 			}
@@ -577,13 +577,13 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 			auto st = do_stage_(ch, workset_, separator_);
 
 			compose_q_.push({feasible_composition{st.vertices.as_span(),
-					copy_to_queue(candidates_, compose_memory_),
-					copy_to_queue(separator_, compose_memory_)}, ownership::owned});
+					copy_to_queue(separator_, compose_memory_),
+					copy_to_queue(candidates_, compose_memory_)}, ownership::owned});
 			compose_memory_.seal();
 		}else{
 			compose_q_.push({feasible_composition{forest.vertices,
-					forest.separator,
-					span<vertex>{}}, ownership::borrowed});
+					span<vertex>{},
+					forest.separator}, ownership::borrowed});
 			compose_memory_.seal();
 		}
 	}
@@ -608,7 +608,7 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		}
 	}
 
-	for(vertex u : comp.prefix) {
+	for(vertex u : comp.candidates) {
 		// Count number of neighbors of the composition.
 		// Since u is a neighbor of the vertex set, subtract one to begin with.
 		int num_composed_neighbors = num_forest_neighbors - 1;
@@ -651,13 +651,13 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		auto st = do_stage_(ch, workset_, separator_);
 
 		candidates_.clear();
-		for(vertex v : comp.prefix)
+		for(vertex v : comp.candidates)
 			if(v > u)
 				candidates_.push_back(v);
 
 		compose_q_.push({feasible_composition{st.vertices.as_span(),
-				copy_to_queue(candidates_, compose_memory_),
-				copy_to_queue(separator_, compose_memory_)}, ownership::owned});
+				copy_to_queue(separator_, compose_memory_),
+				copy_to_queue(candidates_, compose_memory_)}, ownership::owned});
 		compose_memory_.seal();
 	}
 	stats_.time_compose += compose_timer.elapsed();
