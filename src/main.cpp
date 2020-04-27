@@ -23,6 +23,7 @@ enum class solver_algorithm {
 struct options {
 	const char *instance = nullptr;
 	solver_algorithm solver = solver_algorithm::naive_branching;
+	bool witness = false;
 	bool no_kernelization = false;
 	bool no_precedence = false;
 };
@@ -72,6 +73,8 @@ void parse_options(char **p, options &opts) {
 			opts.no_kernelization = true;
 		} else if(handle_nullary_option("--no-precedence")){
 			opts.no_precedence = true;
+		} else if(handle_nullary_option("--witness")){
+			opts.witness = true;
 		} else{
 			error("unknown command line option");
 		}
@@ -122,6 +125,7 @@ int main(int argc, char *argv[]) {
 	std::cout << solution << std::endl;
 	std::cerr << "time: " << print_time(solve_duration) << std::endl;
 
-	for(size_t v = 1; v < g.id_limit(); ++v)
-		std::cout << decomp[v] << std::endl;
+	if(opts.witness)
+		for(size_t v = 1; v < g.id_limit(); ++v)
+			std::cout << decomp[v] << std::endl;
 }
