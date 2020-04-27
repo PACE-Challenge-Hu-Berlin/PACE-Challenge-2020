@@ -82,6 +82,9 @@ private:
 	void join_(int k, int h, feasible_forest &forest);
 	void compose_(int k, int h, feasible_composition &comp);
 
+	staged_tree do_stage_(int h, const std::vector<vertex> &vertices,
+			const std::vector<vertex> &separator);
+
 	graph *g_;
 	graph sg_;
 	memory_arena eternal_arena_;

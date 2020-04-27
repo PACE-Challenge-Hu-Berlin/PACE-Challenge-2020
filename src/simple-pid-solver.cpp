@@ -544,8 +544,6 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		}
 	}
 
-	int ch = h + static_cast<int>(comp.separator.size());
-
 	for(vertex u : comp.prefix) {
 		// Count number of neighbors of the composition.
 		// Since u is a neighbor of the vertex set, subtract one to begin with.
@@ -556,7 +554,9 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 			++num_composed_neighbors;
 		}
 
-		if(ch + 1 + num_composed_neighbors > k) {
+		int ch = h + static_cast<int>(comp.separator.size()) + 1;
+
+		if(ch + num_composed_neighbors > k) {
 			++stats_.num_pruned_compositions;
 			continue;
 		}
@@ -584,32 +584,42 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		separator_.insert(separator_.end(), comp.separator.begin(), comp.separator.end());
 		separator_.push_back(u);
 
-		auto it = staged_trees.find(vertex_key{workset_});
-		if(it == staged_trees.end()) {
-			++num_stage_;
-			staged_tree staged{copy_to_arena(workset_, eternal_arena_),
-					ch + 1, copy_to_arena(separator_, eternal_arena_)};
-			bool success;
-			std::tie(it, success) = staged_trees.emplace(staged.vertices, staged);
-			assert(success);
-		}else if(it->second.h > ch + 1) {
-			++num_stage_;
-			free_in_arena(it->second.separator, eternal_arena_);
-			it->second.h = ch + 1;
-			it->second.separator = copy_to_arena(separator_, eternal_arena_);
-		}else{
-			++num_unimproved_;
-		}
+		auto st = do_stage_(ch, workset_, separator_);
 
 		workset_.clear();
 		for(vertex v : comp.prefix)
 			if(v > u)
 				workset_.push_back(v);
 
-		compose_q_.push({feasible_composition{it->second.vertices.as_span(),
+		compose_q_.push({feasible_composition{st.vertices.as_span(),
 				copy_to_queue(workset_, compose_memory_),
 				copy_to_queue(separator_, compose_memory_)}, ownership::owned});
 		compose_memory_.seal();
 	}
 	stats_.time_compose += compose_timer.elapsed();
+}
+
+// Helper function to stage trees.
+auto simple_pid_solver::do_stage_(int h,
+		const std::vector<vertex> &vertices,
+		const std::vector<vertex> &separator) -> staged_tree {
+	auto it = staged_trees.find(vertex_key{vertices});
+	if(it == staged_trees.end()) {
+		bool success;
+		auto key = vertex_key{copy_to_arena(vertices, eternal_arena_)};
+		std::tie(it, success) = staged_trees.emplace(key, staged_tree{});
+		assert(success);
+		it->second.vertices = key;
+		it->second.h = h;
+		it->second.separator = copy_to_arena(separator, eternal_arena_);
+		++num_stage_;
+	}else if(it->second.h > h) {
+		free_in_arena(it->second.separator, eternal_arena_);
+		it->second.h = h;
+		it->second.separator = copy_to_arena(separator, eternal_arena_);
+		++num_stage_;
+	}else{
+		++num_unimproved_;
+	}
+	return it->second;
 }
