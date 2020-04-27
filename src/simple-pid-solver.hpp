@@ -117,6 +117,7 @@ private:
 	boolean_marker associate_neighbor_marker_;
 	std::vector<vertex> workset_;
 	std::vector<vertex> separator_;
+	std::vector<vertex> candidates_;
 
 	int64_t num_join_;
 	int64_t num_compose_;

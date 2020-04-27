@@ -420,6 +420,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	}
 
 	protected_marker_.reset(sg_.id_limit());
+	bool has_protected_separators = false;
 	if(!no_protected_separators)
 		for(vertex v : forest.separator) {
 			bool protect = true;
@@ -428,8 +429,10 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 					protect = false;
 					break;
 				}
-			if(protect)
+			if(protect) {
 				protected_marker_.mark(v);
+				has_protected_separators = true;
+			}
 		}
 
 	auto join_with = [&] (const feasible_tree &tree) {
@@ -518,10 +521,37 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	stats_.time_join += join_timer.elapsed();
 
 	if(!forest.atomic || forest.trivial) {
-		compose_q_.push({feasible_composition{forest.vertices,
-				forest.separator,
-				span<vertex>{}}, ownership::borrowed});
-		compose_memory_.seal();
+		if(has_protected_separators) {
+			separator_.clear();
+			candidates_.clear();
+			for(vertex v : forest.separator) {
+				if(protected_marker_.is_marked(v)) {
+					separator_.push_back(v);
+				}else{
+					candidates_.push_back(v);
+				}
+			}
+
+			int ch = h + static_cast<int>(separator_.size());
+			assert(ch + static_cast<int>(candidates_.size()) <= k);
+
+			workset_.clear();
+			workset_.insert(workset_.end(), forest.vertices.begin(), forest.vertices.end());
+			workset_.insert(workset_.end(), separator_.begin(), separator_.end());
+			std::sort(workset_.begin(), workset_.end());
+
+			auto st = do_stage_(ch, workset_, separator_);
+
+			compose_q_.push({feasible_composition{st.vertices.as_span(),
+					copy_to_queue(candidates_, compose_memory_),
+					copy_to_queue(separator_, compose_memory_)}, ownership::owned});
+			compose_memory_.seal();
+		}else{
+			compose_q_.push({feasible_composition{forest.vertices,
+					forest.separator,
+					span<vertex>{}}, ownership::borrowed});
+			compose_memory_.seal();
+		}
 	}
 }
 
@@ -586,13 +616,13 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 
 		auto st = do_stage_(ch, workset_, separator_);
 
-		workset_.clear();
+		candidates_.clear();
 		for(vertex v : comp.prefix)
 			if(v > u)
-				workset_.push_back(v);
+				candidates_.push_back(v);
 
 		compose_q_.push({feasible_composition{st.vertices.as_span(),
-				copy_to_queue(workset_, compose_memory_),
+				copy_to_queue(candidates_, compose_memory_),
 				copy_to_queue(separator_, compose_memory_)}, ownership::owned});
 		compose_memory_.seal();
 	}
