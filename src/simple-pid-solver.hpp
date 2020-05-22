@@ -75,8 +75,8 @@ private:
 		borrowed
 	};
 
-	bool decide_treedepth_(int k);
-	bool recover_decomposition_();
+	bool decide_treedepth_(int k, vertex global_root);
+	bool recover_decomposition_(vertex global_root);
 	void join_(int k, int h, feasible_forest &forest);
 	void compose_(int k, int h, feasible_composition &comp);
 

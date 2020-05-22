@@ -140,16 +140,18 @@ int simple_pid_solver::compute_treedepth() {
 	else
 		kern.compute(*g_);
 
-	int td = 0;
+	int td = kern.get_depth();
 	for(size_t i = 0; i < kern.num_components(); ++i) {
-		sg_ = kern.component(i);
+		sg_ = std::get<0>(kern.component(i));
+		int global_td = std::get<1>(kern.component(i));
+		vertex global_root = std::get<2>(kern.component(i));
 
 		int k = 0;
 		std::cerr << "solving component " << (i + 1)
 				<< " of " << kern.num_components() << std::endl;
 		while(true) {
 			try {
-				if(decide_treedepth_(k))
+				if(decide_treedepth_(k, global_root))
 					break;
 			} catch(const std::bad_alloc &) {
 				std::cerr << "allocation failure in simple-pid solver\n"
@@ -163,13 +165,20 @@ int simple_pid_solver::compute_treedepth() {
 			}
 			k++;
 		}
-		td = std::max(td, k);
+		td = std::max(td, global_td + k);
 	}
 
+	std::transform(decomp_.begin(), decomp_.end(),
+			kern.get_kernel_decomposition().begin(), decomp_.begin(),
+			[](const vertex v1, const vertex v2)
+			{
+				assert (v1 == nil_vertex() || v2 == nil_vertex());
+				return (v1 == nil_vertex() ? v2 : v1);
+			});
 	return td;
 }
 
-bool simple_pid_solver::decide_treedepth_(int k) {
+bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 	active_trees.clear();
 	inactive_trees.clear();
 	for(const auto &entry : staged_trees) {
@@ -203,7 +212,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 			continue;
 		}
 
-		pivot_neighbor_marker_.reset(g_->id_limit());
+		pivot_neighbor_marker_.reset(sg_.id_limit());
 		int neighbors_counter = 0;
 		for(auto u : inclusion_precedence_.component(cmp_id))
 		{
@@ -213,7 +222,7 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 				neighbors_counter++;
 			}
 
-			for(auto v : g_->neighbors(u))
+			for(auto v : sg_.neighbors(u))
 			{
 				if(!pivot_neighbor_marker_.is_marked(v))
 				{
@@ -376,10 +385,10 @@ bool simple_pid_solver::decide_treedepth_(int k) {
 		active_trees.clear();
 	}
 
-	return recover_decomposition_();
+	return recover_decomposition_(global_root);
 }
 
-bool simple_pid_solver::recover_decomposition_() {
+bool simple_pid_solver::recover_decomposition_(vertex global_root) {
 	workset_.clear();
 	for(vertex v : sg_.vertices())
 		workset_.push_back(v);
@@ -391,7 +400,7 @@ bool simple_pid_solver::recover_decomposition_() {
 		decomp_[v] = nil_vertex();
 
 	std::stack<std::tuple<vertex, span<vertex>, span<vertex>>> stack;
-	stack.push({0, root_it->second.vertices.as_span(), root_it->second.separator});
+	stack.push({global_root, root_it->second.vertices.as_span(), root_it->second.separator});
 
 	connected_components cc;
 	while(!stack.empty()) {
