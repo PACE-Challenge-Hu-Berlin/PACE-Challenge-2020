@@ -77,6 +77,7 @@ private:
 
 	bool decide_treedepth_(int k, vertex global_root);
 	bool recover_decomposition_(vertex global_root);
+	void process_trivial_(int k, int h);
 	void join_(int k, int h, feasible_forest &forest);
 	void compose_(int k, int h, feasible_composition &comp);
 

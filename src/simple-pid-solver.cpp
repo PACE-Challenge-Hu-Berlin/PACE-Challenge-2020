@@ -276,6 +276,8 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 				<< active_trees.size() << " active trees, "
 				<< inactive_trees.size() << " inactive trees" << std::endl;
 
+		process_trivial_(k, h);
+
 		for(const auto &tree : active_trees) {
 			if(tree.h != h)
 				continue;
@@ -295,36 +297,6 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 					pivot_neighbor_marker_.mark(w);
 					candidates_.push_back(w);
 				}
-
-			auto trivial = (static_cast<int>(tree.vertices.size()) == h);
-			if(trivial) {
-				for(vertex u : candidates_) {
-					associate_neighbor_marker_.reset(sg_.id_limit());
-					int tree_neighbors = static_cast<int>(candidates_.size()) - 1;
-					for(vertex v : sg_.neighbors(u)) {
-						if(pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v))
-							continue;
-						assert(v != u);
-						if(associate_neighbor_marker_.is_marked(v))
-							continue;
-						associate_neighbor_marker_.mark(v);
-						++tree_neighbors;
-					}
-
-					if(h + 1 + tree_neighbors > k)
-						continue;
-
-					workset_.clear();
-					workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
-					workset_.push_back(u);
-					std::sort(workset_.begin(), workset_.end());
-
-					separator_.clear();
-					separator_.push_back(u);
-
-					do_stage_(h + 1, workset_, separator_);
-				}
-			}
 
 			auto rv = tree.vertices.front();
 			join_q_.push({feasible_forest{rv, sg_.id_limit(),
@@ -440,6 +412,129 @@ bool simple_pid_solver::recover_decomposition_(vertex global_root) {
 	}
 
 	return true;
+}
+
+void simple_pid_solver::process_trivial_(int k, int h) {
+	for(const auto &tree : active_trees) {
+		if(tree.h != h)
+			continue;
+
+		auto trivial = (static_cast<int>(tree.vertices.size()) == h);
+		if(!trivial)
+			continue;
+
+		// Find the neighbor set of the tree to turn it into an atomic forest.
+		pivot_marker_.reset(sg_.id_limit());
+		pivot_neighbor_marker_.reset(sg_.id_limit());
+		candidates_.clear();
+		for(vertex v : tree.vertices)
+			pivot_marker_.mark(v);
+		for(vertex v : tree.vertices)
+			for(vertex w : sg_.neighbors(v)) {
+				if(pivot_marker_.is_marked(w))
+					continue;
+				if(pivot_neighbor_marker_.is_marked(w))
+					continue;
+				pivot_neighbor_marker_.mark(w);
+				candidates_.push_back(w);
+			}
+
+		protected_marker_.reset(sg_.id_limit());
+		bool has_forced_separators = false;
+		for(vertex v : candidates_) {
+			bool forced = true;
+			for(vertex w : sg_.neighbors(v)) {
+				if(!pivot_marker_.is_marked(w) && !pivot_neighbor_marker_.is_marked(w)) {
+					forced = false;
+					break;
+				}
+			}
+			if(forced) {
+				protected_marker_.mark(v);
+				has_forced_separators = true;
+			}
+		}
+
+		if(has_forced_separators) {
+			separator_.clear();
+			for(vertex v : candidates_) {
+				if(protected_marker_.is_marked(v))
+					separator_.push_back(v);
+			}
+			assert(!separator_.empty());
+
+			bool precedence_okay = true;
+			for(vertex v : separator_)
+				for(auto w : inclusion_precedence_.vertex_successors(v)) {
+					if(!pivot_marker_.is_marked(w)) {
+						precedence_okay = false;
+						break;
+					}
+				}
+			if(!precedence_okay)
+				continue;
+
+			associate_neighbor_marker_.reset(sg_.id_limit());
+			int tree_neighbors = static_cast<int>(candidates_.size() - separator_.size());
+			for(vertex v : separator_)
+				for(vertex w : sg_.neighbors(v)) {
+					if(pivot_marker_.is_marked(w) || pivot_neighbor_marker_.is_marked(w))
+						continue;
+					if(associate_neighbor_marker_.is_marked(w))
+						continue;
+					associate_neighbor_marker_.mark(w);
+					++tree_neighbors;
+				}
+
+			int composed_h = h + static_cast<int>(separator_.size());
+			if(composed_h + tree_neighbors > k)
+				continue;
+
+			workset_.clear();
+			workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
+			workset_.insert(workset_.end(), separator_.begin(), separator_.end());
+			std::sort(workset_.begin(), workset_.end());
+
+			do_stage_(composed_h, workset_, separator_);
+		}else{
+			for(vertex u : candidates_) {
+				bool precedence_okay = true;
+				for(auto v : inclusion_precedence_.vertex_successors(u)) {
+					if(!pivot_marker_.is_marked(v)) {
+						precedence_okay = false;
+						break;
+					}
+				}
+				if(!precedence_okay)
+					continue;
+
+				associate_neighbor_marker_.reset(sg_.id_limit());
+				int tree_neighbors = static_cast<int>(candidates_.size()) - 1;
+				for(vertex v : sg_.neighbors(u)) {
+					if(pivot_marker_.is_marked(v) || pivot_neighbor_marker_.is_marked(v))
+						continue;
+					assert(v != u);
+					if(associate_neighbor_marker_.is_marked(v))
+						continue;
+					associate_neighbor_marker_.mark(v);
+					++tree_neighbors;
+				}
+
+				if(h + 1 + tree_neighbors > k)
+					continue;
+
+				workset_.clear();
+				workset_.insert(workset_.end(), tree.vertices.begin(), tree.vertices.end());
+				workset_.push_back(u);
+				std::sort(workset_.begin(), workset_.end());
+
+				separator_.clear();
+				separator_.push_back(u);
+
+				do_stage_(h + 1, workset_, separator_);
+			}
+		}
+	}
 }
 
 void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
