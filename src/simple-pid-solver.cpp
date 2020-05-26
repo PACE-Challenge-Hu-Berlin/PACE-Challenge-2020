@@ -198,6 +198,8 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 		inclusion_precedence_.compute(sg_);
 	}
 
+	total_stats_ = statistics{};
+
 	pivot_marker_.reset(inclusion_precedence_.num_components());
 	for(vertex  v : sg_.vertices()) {
 		auto cmp_id = inclusion_precedence_.component_id(v);
@@ -208,7 +210,7 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 
 		if(!inclusion_precedence_.is_maximal(cmp_id))
 		{
-			++stats_.num_pruned_by_precedence;
+			++partial_stats_.num_pruned_by_precedence;
 			continue;
 		}
 
@@ -248,8 +250,8 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 				copy_to_arena(workset_, eternal_arena_)};
 		staged_trees.emplace(staged.vertices, staged);
 	}
-	
-	std::cerr <<  "Pruned components from dynamic programming base " << stats_.num_pruned_by_precedence << std::endl;
+
+	std::cerr <<  "Pruned components from dynamic programming base " << partial_stats_.num_pruned_by_precedence << std::endl;
 
 	for(int h = 1; h < k; h++) {
 		std::cerr << "constructing k = " << k << ", h = " << h << std::endl;
@@ -268,13 +270,10 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 		if(all_trees_inactive)
 			break;
 
-		num_join_ = 0;
-		num_compose_ = 0;
-		num_stage_ = 0;
-		num_unimproved_ = 0;
 		std::cerr << "    there are "
 				<< active_trees.size() << " active trees, "
 				<< inactive_trees.size() << " inactive trees" << std::endl;
+		partial_stats_ = statistics{};
 
 		process_trivial_(k, h);
 
@@ -311,14 +310,14 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 			ownership forest_ownership = compose_q_.front().second;
 			join_q_.pop();
 			join_(k, h, forest);
-			num_join_++;
+			partial_stats_.num_joins++;
 
 			while(!compose_q_.empty()) {
 				feasible_composition comp = compose_q_.front().first;
 				ownership comp_ownership = compose_q_.front().second;
 				compose_q_.pop();
 				compose_(k, h, comp);
-				num_compose_++;
+				partial_stats_.num_compositions++;
 
 				if(comp_ownership == ownership::owned) {
 					free_in_queue(comp.separator, compose_memory_);
@@ -333,29 +332,16 @@ bool simple_pid_solver::decide_treedepth_(int k, vertex global_root) {
 			join_memory_.reclaim();
 		}
 
-		std::cerr << "    staged " << num_stage_
-				<< " trees, discarded " << num_unimproved_
-				<< " (" << num_join_ << " joins, " << num_compose_ << " compositions)"
-				<< std::endl;
-		std::cerr << "    empty separator: " << stats_.num_empty_separator << std::endl;
-		std::cerr << "    pruned forests: " << stats_.num_pruned_forests
-				<< ", compositions: " << stats_.num_pruned_compositions << std::endl;
-		std::cerr << "    protected separators: " << stats_.num_protected_separators
-				<< std::endl;
-		std::cerr << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
-				<< ", allocations: " << eternal_arena_.num_allocations()
-				<< std::endl;
-		std::cerr << "    join memory: " << print_memory{join_memory_.max_used_space()}
-				<< ", compose memory: " << print_memory{compose_memory_.max_used_space()}
-				<< std::endl;
-		std::cerr << "    join time: " << print_time{stats_.time_join}
-				<< ", assembling: " << print_time{stats_.time_join_assemble}
-				<< ", compose: " << print_time{stats_.time_compose} << std::endl;
+		total_stats_ += partial_stats_;
+		log_stats_(true);
 
 		for(const feasible_tree &tree : active_trees)
 			inactive_trees.insert(sg_, tree.vertices, tree);
 		active_trees.clear();
 	}
+
+	std::cerr << "finished k = " << k << std::endl;
+	log_stats_(false);
 
 	return recover_decomposition_(global_root);
 }
@@ -572,8 +558,12 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 				has_protected_separators = true;
 			}
 		}
+	if(has_protected_separators)
+		++partial_stats_.num_forced_separators;
 
 	auto join_with = [&] (const feasible_tree &tree) {
+		++partial_stats_.num_join_combinations;
+
 		int num_total_neighbors = num_forest_neighbors;
 
 		// Determine the neighbors of the tree that we are trying to join.
@@ -598,7 +588,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 		}
 
 		if(h + num_total_neighbors > k) {
-			++stats_.num_pruned_forests;
+			++partial_stats_.num_pruned_forests;
 			return;
 		}
 
@@ -607,12 +597,12 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 			if(associate_neighbor_marker_.is_marked(v)) {
 				separator_.push_back(v);
 			}else if(protected_marker_.is_marked(v)) {
-				++stats_.num_protected_separators;
+				++partial_stats_.num_protected_separators;
 				return;
 			}
 
 		if(!separator_.size()) {
-			++stats_.num_empty_separator;
+			++partial_stats_.num_empty_separator;
 			return;
 		}
 
@@ -634,7 +624,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	auto join_with_other = [&] (const feasible_tree &tree) {
 		profiling_timer assemble_timer;
 		join_with(tree);
-		stats_.time_join_assemble += assemble_timer.elapsed();
+		partial_stats_.time_join_assemble += assemble_timer.elapsed();
 	};
 
 	auto member_predicate = [&] (vertex v) {
@@ -656,7 +646,7 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 	inactive_trees.list_predecessors(sg_, sieve_query_,
 				k - h - num_forest_neighbors, forest.sweep_rv,
 				member_predicate, neighbor_predicate, join_with_other);
-	stats_.time_join += join_timer.elapsed();
+	partial_stats_.time_join += join_timer.elapsed();
 
 	if(!forest.atomic) {
 		if(has_protected_separators) {
@@ -713,6 +703,8 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 	}
 
 	for(vertex u : comp.candidates) {
+		++partial_stats_.num_compose_combinations;
+
 		// Count number of neighbors of the composition.
 		// Since u is a neighbor of the vertex set, subtract one to begin with.
 		int num_composed_neighbors = num_forest_neighbors - 1;
@@ -725,7 +717,7 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 		int ch = h + static_cast<int>(comp.separator.size()) + 1;
 
 		if(ch + num_composed_neighbors > k) {
-			++stats_.num_pruned_compositions;
+			++partial_stats_.num_pruned_compositions;
 			continue;
 		}
 
@@ -738,8 +730,8 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 				break;
 			}
 		}
-		if(!precedence_okay)
-		{
+		if(!precedence_okay) {
+			++partial_stats_.num_precedence_violations;
 			continue;
 		}
 
@@ -764,7 +756,7 @@ void simple_pid_solver::compose_(int k, int h, feasible_composition &comp) {
 				copy_to_queue(candidates_, compose_memory_)}, ownership::owned});
 		compose_memory_.seal();
 	}
-	stats_.time_compose += compose_timer.elapsed();
+	partial_stats_.time_compose += compose_timer.elapsed();
 }
 
 // Helper function to stage trees.
@@ -780,14 +772,89 @@ auto simple_pid_solver::do_stage_(int h,
 		it->second.vertices = key;
 		it->second.h = h;
 		it->second.separator = copy_to_arena(separator, eternal_arena_);
-		++num_stage_;
+		++partial_stats_.num_staged;
+		++partial_stats_.num_unique;
 	}else if(it->second.h > h) {
 		free_in_arena(it->second.separator, eternal_arena_);
 		it->second.h = h;
 		it->second.separator = copy_to_arena(separator, eternal_arena_);
-		++num_stage_;
+		++partial_stats_.num_staged;
 	}else{
-		++num_unimproved_;
+		++partial_stats_.num_unimproved;
 	}
 	return it->second;
+}
+
+void simple_pid_solver::log_stats_(bool partial) {
+	std::stringstream ss;
+
+	const statistics &wanted_stats = partial ? partial_stats_ : total_stats_;
+
+	ss << "    staged " << wanted_stats.num_staged
+			<< " trees (" << wanted_stats.num_unique << " are unique)"
+			<< ", discarded " << wanted_stats.num_unimproved
+			<< '\n';
+
+	float combinations_per_join = static_cast<float>(wanted_stats.num_join_combinations)
+			/ static_cast<float>(wanted_stats.num_joins);
+	float perc_forced_separators = static_cast<float>(wanted_stats.num_forced_separators)
+			/ static_cast<float>(wanted_stats.num_joins) * 100.0f;
+	float perc_empty_separator = static_cast<float>(wanted_stats.num_empty_separator)
+			/ static_cast<float>(wanted_stats.num_join_combinations) * 100.0f;
+	float perc_pruned_forests = static_cast<float>(wanted_stats.num_pruned_forests)
+			/ static_cast<float>(wanted_stats.num_join_combinations) * 100.0f;
+	float perc_protected_separators = static_cast<float>(wanted_stats.num_protected_separators)
+			/ static_cast<float>(wanted_stats.num_join_combinations) * 100.0f;
+
+	ss << "    performed " << wanted_stats.num_joins << " joins";
+	if(partial)
+		ss << " (" << total_stats_.num_joins << " in total)";
+	ss << '\n';
+	ss << "    - enumerated " << wanted_stats.num_join_combinations << " join combinations"
+			<< " (" << combinations_per_join << " per join)"
+			<< '\n';
+	ss << "    - forced separators: " << wanted_stats.num_forced_separators
+			<< " (" << perc_forced_separators << "%)"
+			<< '\n';
+	ss << "    - empty separator: " << wanted_stats.num_empty_separator
+			<< " (" << perc_empty_separator << "%)"
+			<< '\n';
+	ss << "    - pruned forests: " << wanted_stats.num_pruned_forests
+			<< " (" << perc_pruned_forests << "%)"
+			<< ", compositions: " << wanted_stats.num_pruned_compositions
+			<< '\n';
+	ss << "    - protected separators: " << wanted_stats.num_protected_separators
+			<< " (" << perc_protected_separators << "%)"
+			<< '\n';
+
+	float combinations_per_compose = static_cast<float>(wanted_stats.num_compose_combinations)
+			/ static_cast<float>(wanted_stats.num_compositions);
+	float perc_pruned_compositions = static_cast<float>(wanted_stats.num_pruned_compositions)
+			/ static_cast<float>(wanted_stats.num_compose_combinations) * 100.0f;
+	float perc_precedence_violations = static_cast<float>(wanted_stats.num_precedence_violations)
+			/ static_cast<float>(wanted_stats.num_compose_combinations) * 100.0f;
+
+	ss << "    performed " << wanted_stats.num_compositions << " compositions"
+			<< '\n';
+	ss << "    - enumerated " << wanted_stats.num_compose_combinations << " composition combinations"
+			<< " (" << combinations_per_compose << " per composition)"
+			<< '\n';
+	ss << "    - pruned compositions: " << wanted_stats.num_pruned_forests
+			<< " (" << perc_pruned_compositions << "%)"
+			<< '\n';
+	ss << "    - precedence violations: " << wanted_stats.num_precedence_violations
+			<< " (" << perc_precedence_violations << "%)"
+			<< '\n';
+
+	ss << "    eternal memory: " << print_memory{eternal_arena_.used_space()}
+			<< ", allocations: " << eternal_arena_.num_allocations()
+			<< '\n';
+	ss << "    join memory: " << print_memory{join_memory_.max_used_space()}
+			<< ", compose memory: " << print_memory{compose_memory_.max_used_space()}
+			<< '\n';
+	ss << "    join time: " << print_time{wanted_stats.time_join}
+			<< ", assembling: " << print_time{wanted_stats.time_join_assemble}
+			<< ", compose: " << print_time{wanted_stats.time_compose}
+			<< '\n';
+	std::cerr << ss.str() << std::flush;
 }

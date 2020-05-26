@@ -12,14 +12,44 @@
 
 struct simple_pid_solver {
 	struct statistics {
+		int64_t num_pruned_by_precedence = 0;
+		int64_t num_joins = 0;
+		int64_t num_join_combinations = 0;
 		int64_t num_empty_separator = 0;
 		int64_t num_pruned_forests = 0;
-		int64_t num_pruned_compositions = 0;
-		int64_t num_pruned_by_precedence = 0;
+		int64_t num_forced_separators = 0;
 		int64_t num_protected_separators = 0;
+		int64_t num_compositions = 0;
+		int64_t num_compose_combinations = 0;
+		int64_t num_pruned_compositions = 0;
+		int64_t num_precedence_violations = 0;
+		int64_t num_staged = 0;
+		int64_t num_unique = 0;
+		int64_t num_unimproved = 0;
 		profiling_duration time_join{};
 		profiling_duration time_join_assemble{};
 		profiling_duration time_compose{};
+
+		statistics &operator+= (const statistics &other) {
+			num_pruned_by_precedence += other.num_pruned_by_precedence;
+			num_joins += other.num_joins;
+			num_join_combinations += other.num_join_combinations;
+			num_empty_separator += other.num_empty_separator;
+			num_pruned_forests += other.num_pruned_forests;
+			num_forced_separators += other.num_forced_separators;
+			num_protected_separators += other.num_protected_separators;
+			num_compositions += other.num_compositions;
+			num_compose_combinations += other.num_compose_combinations;
+			num_pruned_compositions += other.num_pruned_compositions;
+			num_precedence_violations += other.num_precedence_violations;
+			num_staged += other.num_staged;
+			num_unique += other.num_unique;
+			num_unimproved += other.num_unimproved;
+			time_join += other.time_join;
+			time_join_assemble += other.time_join_assemble;
+			time_compose += other.time_compose;
+			return *this;
+		}
 	};
 
 	struct feasible_tree {
@@ -61,7 +91,7 @@ struct simple_pid_solver {
 	}
 
 	const statistics &stats() {
-		return stats_;
+		return total_stats_;
 	}
 
 	bool no_kernelization = false;
@@ -83,6 +113,7 @@ private:
 
 	staged_tree do_stage_(int h, const std::vector<vertex> &vertices,
 			const std::vector<vertex> &separator);
+	void log_stats_(bool partial);
 
 	graph *g_;
 	graph sg_;
@@ -90,7 +121,8 @@ private:
 	queue_memory join_memory_;
 	queue_memory compose_memory_;
 	std::vector<vertex> decomp_;
-	statistics stats_;
+	statistics partial_stats_;
+	statistics total_stats_;
 
 	precedence_by_inclusion inclusion_precedence_;
 
@@ -117,9 +149,4 @@ private:
 	std::vector<vertex> workset_;
 	std::vector<vertex> separator_;
 	std::vector<vertex> candidates_;
-
-	int64_t num_join_;
-	int64_t num_compose_;
-	int64_t num_stage_;
-	int64_t num_unimproved_;
 };
