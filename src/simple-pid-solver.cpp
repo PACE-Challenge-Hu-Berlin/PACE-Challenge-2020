@@ -582,14 +582,15 @@ void simple_pid_solver::join_(int k, int h, feasible_forest &forest) {
 				if(associate_neighbor_marker_.is_marked(w))
 					continue;
 				associate_neighbor_marker_.mark(w);
-				if(!pivot_neighbor_marker_.is_marked(w))
+				if(!pivot_neighbor_marker_.is_marked(w)) {
 					++num_total_neighbors;
-			}
-		}
 
-		if(h + num_total_neighbors > k) {
-			++partial_stats_.num_pruned_forests;
-			return;
+					if(h + num_total_neighbors > k) {
+						++partial_stats_.num_pruned_forests;
+						return;
+					}
+				}
+			}
 		}
 
 		separator_.clear();
