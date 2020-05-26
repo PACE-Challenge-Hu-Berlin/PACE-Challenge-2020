@@ -53,7 +53,7 @@ clear_status()
 done = 0
 instances = sorted(scan_instances(), key=lambda e: e[1])
 for path, seed, td in instances:
-	args = ['./build/td', '--solver', 'simple-pid', '--no-kernelization', '--witness', path]
+	args = ['./build/td', '--solver', 'simple-pid', '--witness', path]
 	proc = subprocess.run(args,
 			stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 	if proc.returncode != 0:
