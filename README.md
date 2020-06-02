@@ -11,7 +11,7 @@ meson --buildtype=debugoptimized ..
 
 ## Running
 
-Run the solver via: `./td --solver simple-pid INSTANCE` where `INSTANCE` is a `.gr` file in PACE format.
+Run the solver via: `./td --solver simple-pid --witness INSTANCE` where `INSTANCE` is a `.gr` file in PACE format.
 
 
 ## PACE 2020 submission
