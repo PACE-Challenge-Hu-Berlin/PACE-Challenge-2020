@@ -1,2 +1,3 @@
-option('td-sanity-checks', type: 'boolean', value: 'false')
 option('td-static', type: 'boolean', value: 'false')
+option('td-sanity-checks', type: 'boolean', value: 'false')
+option('td-avoid-madvfree', type: 'boolean', value: 'false')

@@ -5,6 +5,7 @@
 #include <new>
 #include <type_traits>
 
+#include "config.hpp"
 #include "data-structures.hpp"
 #include "mm.hpp"
 
@@ -40,7 +41,7 @@ namespace {
 
 	void uncommit_vm(void *window, size_t size) {
 		// TODO: should we also call mprotect to PROT_NONE the area again?
-#ifdef MADV_FREE
+#if defined(MADV_FREE) && !defined(TD_AVOID_MADVFREE)
 		if(madvise(window, size, MADV_FREE)) {
 			std::cerr << "madvise(MADV_FREE) failure:"
 					" cannot uncommit virtual memory" << std::endl;

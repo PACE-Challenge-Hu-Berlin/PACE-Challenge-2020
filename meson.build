@@ -2,6 +2,7 @@ project('treedepth', 'cpp')
 
 conf_data = configuration_data()
 conf_data.set('TD_SANITY_CHECKS', get_option('td-sanity-checks'))
+conf_data.set('TD_AVOID_MADVFREE', get_option('td-avoid-madvfree'))
 
 if get_option('td-static')
 	add_project_link_arguments('-static-libgcc', '-static-libstdc++',

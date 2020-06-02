@@ -1,6 +1,7 @@
 #pragma once
 
 #mesondefine TD_SANITY_CHECKS
+#mesondefine TD_AVOID_MADVFREE
 
 #ifdef TD_SANITY_CHECKS
 	static constexpr bool enable_sanity_checks = true;
